@@ -1,0 +1,25 @@
+# Bytecode + build artifacts
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Virtual environments
+.venv/
+.env
+
+# IDE/editor config
+.vscode/
+.idea/
+
+# OS-specific cruft
+.DS_Store
+
+# Local auth and config (MCP secrets)
+auth_record.json
+auth_cache/
+
+
+# Test caches
+tests/__pycache__/
+tests/
+pytest.ini
