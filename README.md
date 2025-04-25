@@ -41,8 +41,37 @@ uv venv
 uv pip install -r uv.lock
 
 # Run locally using MCP Inspector
-uv run mcp dev mcpserver/server.py
+uv run mcp dev mcpserver/server.py (expect errors)
 ```
+It is much easier to get things working in the Inspector before trying to debug in Claude.
+
+---
+
+## 🔐 Authentication Setup
+Before running the application, you need to set up the following:
+
+1. Create an auth_cache folder in the project root (see note):
+```BASH
+mkdir -p auth_cache
+```
+
+2. Create a .env file in the project root
+```bash
+touch .env
+```
+3. Add the following to the .env:
+```BASH
+echo "AZURE_CLIENT_ID=<your-id-from-Azure-portal-here>" > .env
+echo "AZURE_TENANT_ID=<your-id-from-Azure-portal-here>" >> .env
+echo "AZURE_GRAPH_SCOPES=User.Read Mail.Read Mail.Send Mail.ReadWrite" >> .env
+```
+NOTE: On first run, the application will authenticate using the DeviceCodeCredential flow and will create auth_record.json in the auth_cache folder automatically.
+
+### You must have admin access to an Azure tenant to register an application with these permissions.
+
+---
+## Claude for Desktop Integration
+
 To integrate with Claude Desktop, add this to your claude_desktop_config.json:
 ```
 {
@@ -59,11 +88,10 @@ To integrate with Claude Desktop, add this to your claude_desktop_config.json:
   }
 }
 ```
-Then restart Claude Desktop.
+On Mac you can find the json file by looking in Settings/Developer/Edit Config
 
-## 🔐 Auth Notes
+### Restart Claude Desktop each time you make a change to config or to the server code.
 
-The first time you run the server, you’ll be prompted to authenticate via a browser window. This uses the Microsoft DeviceCodeCredential flow with local caching, so you’ll only need to sign in once.
 
 ---
 
@@ -88,8 +116,8 @@ The first time you run the server, you’ll be prompted to authenticate via a br
 ---
 
 ## 📌 Roadmap
-- Mail integration
-- Calendar integration
+- Mail integration (DONE)
+- Calendar integration (Started)
 - Optional OneDrive integration
 - Windows support
 - GUI-free auth for end-users (if feasible)
