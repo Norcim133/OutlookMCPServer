@@ -17,6 +17,15 @@ from typing import List
 from pathlib import Path
 import os
 
+import logging
+
+# Simple console-only logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger("outlook_mcp")
+
 class Graph:
     settings: SectionProxy
     device_code_credential: DeviceCodeCredential
@@ -27,18 +36,23 @@ class Graph:
         client_id = settings.client_id
         tenant_id = settings.tenant_id
         graph_scopes = settings.scopes
-        cache_options = TokenCachePersistenceOptions(
-            name="OutlookMCP",
-            allow_unencrypted_storage=True)
+
+        # Get path to auth_cache directory
+        auth_cache_dir = Path(__file__).parent.parent / "auth_cache"
 
         # Path to store the authentication record
-        auth_record_path = Path(__file__).parent.parent / "auth_cache" / "auth_record.json"
+        auth_record_path = auth_cache_dir / "auth_record.json"
 
-        # Try to load existing authentication record
-        if os.path.exists(auth_record_path):
+        #NOTE: run python authenticate.py on first auth or to refresh your authentication
+        # Try to load existing authentication record but send user to authenticate if not found
+        try:
             with open(auth_record_path, "r") as file:
                 auth_record_json = file.read()
                 auth_record = AuthenticationRecord.deserialize(auth_record_json)
+
+            cache_options = TokenCachePersistenceOptions(
+                name="OutlookMCP",
+                allow_unencrypted_storage=False)
 
             # Create credential with the authentication record
             self.credential = DeviceCodeCredential(
@@ -47,22 +61,30 @@ class Graph:
                 cache_persistence_options=cache_options,
                 authentication_record=auth_record
             )
-        else:
-            # First-time authentication
-            self.credential = DeviceCodeCredential(
-                client_id=client_id,
-                tenant_id=tenant_id,
-                cache_persistence_options=cache_options
+
+            # Initialize the Graph client
+            self.user_client = GraphServiceClient(
+                credentials=self.credential,
+                scopes=graph_scopes
             )
 
-            # Authenticate and save the record for future use
-            auth_record = self.credential.authenticate(scopes=graph_scopes)
-            with open(auth_record_path, "w") as file:
-                file.write(auth_record.serialize())
-        self.user_client = GraphServiceClient(
-            credentials=self.credential,
-            scopes=graph_scopes
-        )
+        except FileNotFoundError:
+            error_msg = (
+                f"No authentication record found at: {auth_record_path}. "
+                "Please run 'python authenticate.py' first to authenticate with Microsoft Graph."
+            )
+            logger.error(error_msg)
+
+            raise ValueError(error_msg)
+
+        except Exception as e:
+            error_msg = (
+                f"Error loading authentication: {str(e)}. "
+                "Please run 'python authenticate.py' to refresh your authentication."
+            )
+            logger.error(error_msg)
+
+            raise ValueError(error_msg)
 
 
     async def get_user(self, all_properties: bool = False):

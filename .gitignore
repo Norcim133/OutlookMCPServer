@@ -23,3 +23,4 @@ auth_cache/
 tests/__pycache__/
 tests/
 pytest.ini
+*.log
