@@ -1,4 +1,3 @@
-from configparser import SectionProxy
 from azure.identity import DeviceCodeCredential, TokenCachePersistenceOptions, AuthenticationRecord
 from settings import AzureSettings
 from msgraph import GraphServiceClient
@@ -27,11 +26,11 @@ logging.basicConfig(
 logger = logging.getLogger("outlook_mcp")
 
 class Graph:
-    settings: SectionProxy
+    settings: AzureSettings
     device_code_credential: DeviceCodeCredential
     user_client: GraphServiceClient
 
-    def __init__(self, config: SectionProxy):
+    def __init__(self, config: AzureSettings):
         settings = AzureSettings()
         client_id = settings.client_id
         tenant_id = settings.tenant_id
