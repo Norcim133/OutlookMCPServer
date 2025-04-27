@@ -1,11 +1,13 @@
 from mcp.server.fastmcp import FastMCP, Context
 from mcp.server.fastmcp.prompts import base
 
+from mcpserver.calendar_formatting import format_event_page
 from mcpserver.auth_wrapper import requires_graph_auth
 from mcpserver.context_manager import app_lifespan
 from mcpserver.mail_query import MailQuery
 from typing import Any, Optional, List
 import json
+
 
 APP_INSTRUCTIONS = """
 You are an expert email assistant with full access to the user's Microsoft365 email account via the OutlookMCP server.
@@ -807,6 +809,166 @@ async def list_available_tools(ctx: Context) -> str:
 @mcp.resource(uri="resource://instructions", name="Instructions", description="Overview of OutlookMCP's capabilities.")
 def get_app_instructions() -> str:
     return APP_INSTRUCTIONS
+
+
+@mcp.tool()
+@requires_graph_auth
+async def list_calendar_events(ctx: Context, count: int = 10) -> str:
+    """
+    List upcoming calendar events from the user's default calendar
+
+    Args:
+        ctx: FastMCP Context
+        count: Maximum number of events to retrieve (default: 10)
+
+    Returns:
+        A formatted string with event details including subject, organizer, start/end times, and location
+    """
+    graph = ctx.request_context.lifespan_context.graph
+    events_page = await graph.calendar.list_events(count=count)
+
+    result = "Upcoming calendar events:\n\n"
+    result += format_event_page(events_page)
+
+    return result
+
+
+@mcp.tool()
+@requires_graph_auth
+async def list_calendar_by_date_range(ctx: Context, start_date: Optional[str] = None, end_date: Optional[str] = None) -> str:
+    """
+    List calendar events within a specific date range
+
+    Args:
+        ctx: FastMCP Context
+        start_date: Start date in format "YYYY-MM-DD" (default: beginning of current week)
+        end_date: End date in format "YYYY-MM-DD" (default: 2 weeks from start_date)
+
+    Returns:
+        A formatted string with event details within the specified date range
+    """
+    graph = ctx.request_context.lifespan_context.graph
+
+    try:
+        events_page = await graph.calendar.list_events_by_date_range(start_date=start_date, end_date=end_date)
+
+        # Get the actual date range used (for display in result)
+        import datetime
+
+        if not start_date:
+            today = datetime.datetime.now().date()
+            start_of_week = today - datetime.timedelta(days=today.weekday())
+            start_date = start_of_week.strftime("%Y-%m-%d")
+
+        if not end_date:
+            start_date_obj = datetime.datetime.strptime(start_date, "%Y-%m-%d").date()
+            end_date_obj = start_date_obj + datetime.timedelta(days=14)
+            end_date = end_date_obj.strftime("%Y-%m-%d")
+
+        # Format the dates for display
+        start_display = datetime.datetime.strptime(start_date, "%Y-%m-%d").strftime("%A, %B %d, %Y")
+        end_display = datetime.datetime.strptime(end_date, "%Y-%m-%d").strftime("%A, %B %d, %Y")
+
+        result = f"Calendar events from {start_display} to {end_display}:\n\n"
+
+        # Reuse your existing formatting function
+        from mcpserver.calendar_formatting import format_event_page
+        result += format_event_page(events_page)
+
+        return result
+    except Exception as e:
+        return f"Error retrieving calendar events: {str(e)}"
+
+
+@mcp.tool()
+@requires_graph_auth
+async def create_calendar_event(ctx: Context,
+                                subject: Optional[str],
+                                start_datetime: str,
+                                end_datetime: str,
+                                body: Optional[str] = "",
+                                location: Optional[str] = None,
+                                is_online_meeting: Optional[bool] = False,
+                                attendees: Optional[str] = "") -> str:
+    """
+    Create a new calendar event
+
+    Args:
+        ctx: FastMCP Context
+        subject: Subject of the event
+        start_datetime: Start time in format "YYYY-MM-DDTHH:MM:SS"
+        end_datetime: End time in format "YYYY-MM-DDTHH:MM:SS"
+        body: Body content of the event (can include HTML)
+        location: Optional location name
+        is_online_meeting: Whether to make this a Teams online meeting
+        attendees: Optional comma-separated list of attendee emails
+
+    Returns:
+        A confirmation message with the created event details
+    """
+    graph = ctx.request_context.lifespan_context.graph
+
+    try:
+        # Parse attendees if provided
+        attendee_list = None
+        if attendees:
+            attendee_list = []
+            for email in attendees.split(','):
+                email = email.strip()
+                if email:
+                    attendee_list.append({"email": email})
+
+        # Create the event
+        result = await graph.calendar.create_event(
+            subject=subject,
+            body=body or f"<p>{subject}</p>",  # Default to subject if body is empty
+            start_datetime=start_datetime,
+            end_datetime=end_datetime,
+            location=location,
+            is_online_meeting=is_online_meeting,
+            attendees=attendee_list
+        )
+
+        # Get formatted event details to return
+        from mcpserver.calendar_formatting import format_calendar_event
+        formatted_event = format_calendar_event(result)
+
+        return f"Event created successfully:\n\n{formatted_event}"
+
+    except Exception as e:
+        return f"Error creating calendar event: {str(e)}"
+
+
+@mcp.tool()
+@requires_graph_auth
+async def delete_calendar_event(ctx: Context, event_id: str, notify_attendees: bool = True) -> str:
+    """
+    Delete a calendar event
+
+    Args:
+        ctx: FastMCP Context
+        event_id: ID of the event to delete
+        notify_attendees: Whether to send cancellation notices to attendees (default: True)
+
+    Returns:
+        Confirmation message
+    """
+    graph = ctx.request_context.lifespan_context.graph
+
+    try:
+        # get the event details to provide in the confirmation message
+        event = await graph.user_client.me.events.by_event_id(event_id).get()
+        event_subject = event.subject if event else "Unknown event"
+
+        # Delete the event
+        await graph.calendar.delete_event(event_id, notify_attendees)
+
+        notification_status = "with" if notify_attendees else "without"
+        return f"Event successfully deleted {notification_status} attendee notification: '{event_subject}' (ID: {event_id})"
+    except Exception as e:
+        return f"Error deleting calendar event: {str(e)}"
+
+##########################
 
 def run():
     mcp.run()
