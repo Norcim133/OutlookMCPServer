@@ -1,7 +1,8 @@
 from mcp.server.fastmcp import FastMCP, Context
 from mcp.server.fastmcp.prompts import base
 
-from mcpserver.msgraph_client import app_lifespan
+from mcpserver.auth_wrapper import requires_graph_auth
+from mcpserver.context_manager import app_lifespan
 from mcpserver.mail_query import MailQuery
 from typing import Any, Optional, List
 import json
@@ -30,6 +31,7 @@ mcp = FastMCP(
     lifespan=app_lifespan,
     instructions=APP_INSTRUCTIONS
 )
+
 
 def format_email_headers(message_page):
     """Format email headers for display
@@ -103,8 +105,10 @@ def format_email_headers(message_page):
 
     return result
 
+
 # Add a tool to list inbox messages
 @mcp.tool()
+@requires_graph_auth
 async def list_inbox_messages(ctx: Context, count: int = 50) -> str:
     """
     Key header details for inbox messages default of 25 messages.
@@ -126,6 +130,7 @@ async def list_inbox_messages(ctx: Context, count: int = 50) -> str:
 
 
 @mcp.tool()
+@requires_graph_auth
 async def list_email_folders(ctx: Context) -> str:
     """
     List all email folders and their structure in your Outlook account
@@ -163,6 +168,7 @@ async def list_email_folders(ctx: Context) -> str:
         return f"Error listing mail folders: {str(e)}"
 
 @mcp.tool()
+@requires_graph_auth
 async def get_mail_folder_name_with_id(ctx: Context, folder_id: str) -> str:
     """Get folder name with specified ID
 
@@ -181,6 +187,7 @@ async def get_mail_folder_name_with_id(ctx: Context, folder_id: str) -> str:
     return folder
 
 @mcp.tool()
+@requires_graph_auth
 async def get_folders_and_inbox_mails_for_sort_planning(ctx: Context) -> str:
     """Get the current available folder structure for mails and get mails in the inbox with guidance on how to plan sorting
 
@@ -206,6 +213,7 @@ async def get_folders_and_inbox_mails_for_sort_planning(ctx: Context) -> str:
     """)]
 
 @mcp.tool()
+@requires_graph_auth
 async def get_folder_id_dict(ctx: Context) -> str:
     """Get dict that matches folder names to IDs
 
@@ -220,6 +228,7 @@ async def get_folder_id_dict(ctx: Context) -> str:
     return folder_id_dict
 
 @mcp.tool()
+@requires_graph_auth
 async def move_email_to_folder(ctx: Context, message_id: str=None, folder_id: str=None) -> str:
     """Move an email to a specified folder
     Args:
@@ -248,6 +257,7 @@ async def move_email_to_folder(ctx: Context, message_id: str=None, folder_id: st
 
 
 @mcp.tool()
+@requires_graph_auth
 async def get_inbox_count(ctx: Context) -> str:
     """Get the number of messages in the inbox
 
@@ -266,6 +276,7 @@ async def get_inbox_count(ctx: Context) -> str:
         return "Inbox count not found"
 
 @mcp.tool()
+@requires_graph_auth
 async def get_mail_with_mail_id(ctx: Context, message_id: str) -> str:
     """Get message with specified message_id
 
@@ -287,6 +298,7 @@ async def get_mail_with_mail_id(ctx: Context, message_id: str) -> str:
 
 
 @mcp.tool()
+@requires_graph_auth
 async def get_mail_from_specific_folder(ctx: Context, folder_id: str, count: int=50) -> str:
     """Get all messages from a specific folder"""
     graph = ctx.request_context.lifespan_context.graph
@@ -299,6 +311,7 @@ async def get_mail_from_specific_folder(ctx: Context, folder_id: str, count: int
 
 
 @mcp.tool()
+@requires_graph_auth
 async def search_by_subject(ctx: Context, subject: str, folder_id: str = "inbox") -> str:
     """
     Search for emails by subject
@@ -324,6 +337,7 @@ async def search_by_subject(ctx: Context, subject: str, folder_id: str = "inbox"
 
 
 @mcp.tool()
+@requires_graph_auth
 async def search_unread_emails(ctx: Context, folder_id: str = "inbox", count: int = 20) -> str:
     """
     Get unread emails
@@ -349,6 +363,7 @@ async def search_unread_emails(ctx: Context, folder_id: str = "inbox", count: in
 
 
 @mcp.tool()
+@requires_graph_auth
 async def advanced_mail_search(ctx: Context, search_query: Any) -> str:
     """
     Search for emails using advanced criteria in JSON format
@@ -408,6 +423,7 @@ async def advanced_mail_search(ctx: Context, search_query: Any) -> str:
 
 
 @mcp.tool()
+@requires_graph_auth
 async def get_available_search_properties(ctx: Context) -> str:
     """
     Get search guidance and resolve search query errors
@@ -456,6 +472,7 @@ To use these properties, create a JSON object with your desired search criteria 
 
 
 @mcp.tool()
+@requires_graph_auth
 async def create_top_level_folder(ctx: Context, folder_name: str) -> str:
     """
     Create a new top-level folder in your mailbox
@@ -478,6 +495,7 @@ async def create_top_level_folder(ctx: Context, folder_name: str) -> str:
 
 
 @mcp.tool()
+@requires_graph_auth
 async def create_subfolder(ctx: Context, folder_name: str, parent_folder_id: str) -> str:
     """
     Create a subfolder within an existing mail folder
@@ -503,6 +521,7 @@ async def create_subfolder(ctx: Context, folder_name: str, parent_folder_id: str
         return f"Error creating subfolder: {str(e)}"
 
 @mcp.tool()
+@requires_graph_auth
 async def get_user(ctx: Context, all_properties: bool = False) -> str:
     """Get user details
 
@@ -523,6 +542,7 @@ async def get_user(ctx: Context, all_properties: bool = False) -> str:
 
 
 @mcp.tool()
+@requires_graph_auth
 async def compose_new_email(ctx: Context,
                             to_recipients: str,
                             subject: str,
@@ -572,6 +592,7 @@ async def compose_new_email(ctx: Context,
 
 
 @mcp.tool()
+@requires_graph_auth
 async def reply_to_email(ctx: Context,
                          message_id: str,
                          body: str,
@@ -621,6 +642,7 @@ async def reply_to_email(ctx: Context,
         return f"Error replying to email: {str(e)}"
 
 @mcp.tool()
+@requires_graph_auth
 async def create_draft_reply(ctx: Context, message_id: str) -> str:
     """
     Create a draft reply to an existing email
@@ -644,6 +666,7 @@ async def create_draft_reply(ctx: Context, message_id: str) -> str:
 
 
 @mcp.tool()
+@requires_graph_auth
 async def update_draft_email(ctx: Context,
                              draft_id: str,
                              body: Optional[str] = None,
@@ -698,6 +721,7 @@ async def update_draft_email(ctx: Context,
 
 
 @mcp.tool()
+@requires_graph_auth
 async def send_draft_email(ctx: Context, draft_id: str) -> str:
     """
     Send an existing draft email
@@ -724,6 +748,7 @@ async def send_draft_email(ctx: Context, draft_id: str) -> str:
 
 
 @mcp.tool()
+@requires_graph_auth
 async def update_mail_properties(ctx: Context,
                                  message_id: str,
                                  is_read: Optional[bool] = None,
@@ -767,6 +792,7 @@ async def update_mail_properties(ctx: Context,
 
 
 @mcp.tool()
+@requires_graph_auth
 async def list_available_tools(ctx: Context) -> str:
     """
     Return all registered tools with their descriptions (ideal for Claude to self-discover).
@@ -778,7 +804,7 @@ async def list_available_tools(ctx: Context) -> str:
         summaries.append(f"• {tool.name}({args}): {tool.description or '(No description)'}")
     return "\n".join(sorted(summaries))
 
-@mcp.resource("resource://instructions", name="Instructions", description="Overview of OutlookMCP's capabilities.")
+@mcp.resource(uri="resource://instructions", name="Instructions", description="Overview of OutlookMCP's capabilities.")
 def get_app_instructions() -> str:
     return APP_INSTRUCTIONS
 

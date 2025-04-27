@@ -41,7 +41,7 @@ uv venv
 uv pip install -r uv.lock
 
 # Run locally using MCP Inspector
-uv run mcp dev mcpserver/server.py (expect errors)
+mcp dev main.py (expect errors)
 ```
 It is much easier to get things working in the Inspector before trying to debug in Claude.
 
@@ -65,7 +65,7 @@ echo "AZURE_CLIENT_ID=<your-id-from-Azure-portal-here>" > .env
 echo "AZURE_TENANT_ID=<your-id-from-Azure-portal-here>" >> .env
 echo "AZURE_GRAPH_SCOPES=User.Read Mail.Read Mail.Send Mail.ReadWrite" >> .env
 ```
-NOTE: On first run, the application will authenticate using the DeviceCodeCredential flow and will create auth_record.json in the auth_cache folder automatically.
+NOTE: On first run, the application will authenticate using the DeviceCodeCredential flow and will create auth_record.json in the auth_cache folder automatically if successful.
 
 ### You must have admin access to an Azure tenant to register an application with these permissions.
 
@@ -79,16 +79,20 @@ To integrate with Claude Desktop, add this to your claude_desktop_config.json:
     "outlook": {
       "command": "uv",
       "args": [
-        "--directory",
-        "/absolute/path/to/OutlookMCPServer",
         "run",
-        "mcpserver/main.py"
+        "--with",
+        "azure-identity,mcp[cli],msgraph-core,msgraph-sdk",
+        "mcp",
+        "run",
+        "/absolute/path/to/OutlookMCPServer"
       ]
     }
   }
 }
 ```
-On Mac you can find the json file by looking in Settings/Developer/Edit Config
+In Claude Desktop, you can find the json file by looking in Settings/Developer/Edit Config.
+
+NOTE: You may need to replace "uv" with an absolute reference in "command"
 
 ### Restart Claude Desktop each time you make a change to config or to the server code.
 
@@ -105,23 +109,26 @@ On Mac you can find the json file by looking in Settings/Developer/Edit Config
 │   └── auth_record.json
 ├── mcpserver/
 │   ├── __init__.py
+│   ├── auth_wrapper.py
+│   ├── context_manager.py
 │   ├── graph.py
 │   ├── mail_query.py
 │   ├── message_info.py
-│   ├── msgraph_client.py
 │   └── server.py
 ├── tests/
+├── .env
+├── __init__.py
+├── main.py
 ```
 
 ---
 
 ## 📌 Roadmap
 - Mail integration (DONE)
+- Auth in Claude Desktop (DONE)
 - Calendar integration (Started)
 - Optional OneDrive integration
 - Windows support
-- GUI-free auth for end-users (if feasible)
-
 ---
 
 ## 📄 License

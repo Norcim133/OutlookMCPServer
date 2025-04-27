@@ -1,4 +1,3 @@
-from azure.identity import DeviceCodeCredential, TokenCachePersistenceOptions, AuthenticationRecord
 from settings import AzureSettings
 from msgraph import GraphServiceClient
 from msgraph.generated.users.item.user_item_request_builder import UserItemRequestBuilder
@@ -13,78 +12,13 @@ from msgraph.generated.users.item.mail_folders.item.move.move_post_request_body 
 from kiota_abstractions.base_request_configuration import RequestConfiguration
 from mcpserver.mail_query import MailQuery
 from typing import List
-from pathlib import Path
-import os
-
 import logging
 
-# Simple console-only logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger("outlook_mcp")
-
 class Graph:
-    settings: AzureSettings
-    device_code_credential: DeviceCodeCredential
     user_client: GraphServiceClient
 
-    def __init__(self, config: AzureSettings):
-        settings = AzureSettings()
-        client_id = settings.client_id
-        tenant_id = settings.tenant_id
-        graph_scopes = settings.scopes
-
-        # Get path to auth_cache directory
-        auth_cache_dir = Path(__file__).parent.parent / "auth_cache"
-
-        # Path to store the authentication record
-        auth_record_path = auth_cache_dir / "auth_record.json"
-
-        #NOTE: run python authenticate.py on first auth or to refresh your authentication
-        # Try to load existing authentication record but send user to authenticate if not found
-        try:
-            with open(auth_record_path, "r") as file:
-                auth_record_json = file.read()
-                auth_record = AuthenticationRecord.deserialize(auth_record_json)
-
-            cache_options = TokenCachePersistenceOptions(
-                name="OutlookMCP",
-                allow_unencrypted_storage=False)
-
-            # Create credential with the authentication record
-            self.credential = DeviceCodeCredential(
-                client_id=client_id,
-                tenant_id=tenant_id,
-                cache_persistence_options=cache_options,
-                authentication_record=auth_record
-            )
-
-            # Initialize the Graph client
-            self.user_client = GraphServiceClient(
-                credentials=self.credential,
-                scopes=graph_scopes
-            )
-
-        except FileNotFoundError:
-            error_msg = (
-                f"No authentication record found at: {auth_record_path}. "
-                "Please run 'python authenticate.py' first to authenticate with Microsoft Graph."
-            )
-            logger.error(error_msg)
-
-            raise ValueError(error_msg)
-
-        except Exception as e:
-            error_msg = (
-                f"Error loading authentication: {str(e)}. "
-                "Please run 'python authenticate.py' to refresh your authentication."
-            )
-            logger.error(error_msg)
-
-            raise ValueError(error_msg)
-
+    def __init__(self, user_client: GraphServiceClient):
+        self.user_client = user_client
 
     async def get_user(self, all_properties: bool = False):
         # Only request specific properties using $select
