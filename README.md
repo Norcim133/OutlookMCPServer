@@ -108,10 +108,14 @@ NOTE: You may need to replace "uv" with an absolute reference in "command"
 ├── auth_cache/
 │   └── auth_record.json
 ├── mcpserver/
+│   └── graph/
+│       ├── __init__.py
+│       ├── calendar_service.py
+│       ├── controller.py
+│       ├── mail_service.py
 │   ├── __init__.py
 │   ├── auth_wrapper.py
 │   ├── context_manager.py
-│   ├── graph.py
 │   ├── mail_query.py
 │   ├── message_info.py
 │   └── server.py
