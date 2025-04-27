@@ -4,7 +4,7 @@ from typing import Callable
 
 
 def requires_graph_auth(func: Callable) -> Callable:
-    """Decorator that handles Microsoft Graph authentication before executing the wrapped function"""
+    """Decorator that handles Microsoft GraphController authentication before executing the wrapped function"""
 
     @functools.wraps(func)
     async def wrapper(ctx, *args, **kwargs):

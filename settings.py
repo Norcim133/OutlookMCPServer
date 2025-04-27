@@ -10,7 +10,7 @@ load_dotenv()
 
 class AzureSettings:
     """
-    Manages authentication with Azure Graph API
+    Manages authentication with Azure GraphController API
     Assumes .env storing client_id, tenant_id, and scopes in environment variables
     Stores authentication record in auth_cache directory (creates directory if needed)
     Claude Desktop can't trigger interactive authentication challenges (e.g. in browser)

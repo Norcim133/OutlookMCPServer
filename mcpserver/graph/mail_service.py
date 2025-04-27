@@ -1,6 +1,6 @@
-from settings import AzureSettings
+# mcpserver/graph/mail_service.py
 from msgraph import GraphServiceClient
-from msgraph.generated.users.item.user_item_request_builder import UserItemRequestBuilder
+from kiota_abstractions.base_request_configuration import RequestConfiguration
 from msgraph.generated.users.item.mail_folders.item.messages.messages_request_builder import MessagesRequestBuilder
 from msgraph.generated.users.item.send_mail.send_mail_post_request_body import SendMailPostRequestBody
 from msgraph.generated.models.message import Message
@@ -9,32 +9,20 @@ from msgraph.generated.models.body_type import BodyType
 from msgraph.generated.models.recipient import Recipient
 from msgraph.generated.models.email_address import EmailAddress
 from msgraph.generated.users.item.mail_folders.item.move.move_post_request_body import MovePostRequestBody
-from kiota_abstractions.base_request_configuration import RequestConfiguration
 from mcpserver.mail_query import MailQuery
 from typing import List
-import logging
 
-class Graph:
-    user_client: GraphServiceClient
+
+class MailService:
+    """Service for mail-related operations using Microsoft Graph API"""
 
     def __init__(self, user_client: GraphServiceClient):
         self.user_client = user_client
 
-    async def get_user(self, all_properties: bool = False):
-        # Only request specific properties using $select
-        if all_properties:
-            user = await self.user_client.me.get()
-        else:
-            query_params = UserItemRequestBuilder.UserItemRequestBuilderGetQueryParameters(
-                select=['displayName', 'mail', 'userPrincipalName']
-            )
 
-            request_config = RequestConfiguration(
-                query_parameters=query_params
-            )
-
-            user = await self.user_client.me.get(request_configuration=request_config)
-        return user
+    async def get_inbox(self, count: int = 50):
+        # Your existing code, unchanged
+        pass
 
     async def get_inbox(self, count: int=50):
         query_params = MessagesRequestBuilder.MessagesRequestBuilderGetQueryParameters(

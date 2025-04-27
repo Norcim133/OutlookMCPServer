@@ -21,7 +21,7 @@ class MessageInfo:
     conversation_id: Optional[str] = None
 
     def __init__(self, message):
-        """Initialize from a Graph API message object"""
+        """Initialize from a GraphController API message object"""
         self.id = message.id
         self.subject = message.subject or "(No subject)"
         self.received_time = message.received_date_time if hasattr(message, 'received_date_time') else None

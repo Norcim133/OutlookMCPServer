@@ -37,7 +37,7 @@ def format_email_headers(message_page):
     """Format email headers for display
 
     Args:
-        message_page: Page of messages from the Graph API
+        message_page: Page of messages from the GraphController API
 
     Returns:
         String with formatted email headers
@@ -121,7 +121,7 @@ async def list_inbox_messages(ctx: Context, count: int = 50) -> str:
         A formatted string with message details including subject, sender, read status, and received date
     """
     graph = ctx.request_context.lifespan_context.graph
-    message_page = await graph.get_inbox(count=count)
+    message_page = await graph.mail.get_inbox(count=count)
     result = "Recent emails in your inbox:\n\n"
 
     result += format_email_headers(message_page)
@@ -145,7 +145,7 @@ async def list_email_folders(ctx: Context) -> str:
 
     # Get the folder hierarchy
     try:
-        folder_hierarchy = await graph.get_mail_folder_hierarchy()
+        folder_hierarchy = await graph.mail.get_mail_folder_hierarchy()
 
         result = "Your email folder structure:\n\n"
 
@@ -183,7 +183,7 @@ async def get_mail_folder_name_with_id(ctx: Context, folder_id: str) -> str:
     if folder_id is None:
         return "Please provide a folder ID"
     graph = ctx.request_context.lifespan_context.graph
-    folder = await graph.get_mail_folder_by_id(folder_id)
+    folder = await graph.mail.get_mail_folder_by_id(folder_id)
     return folder
 
 @mcp.tool()
@@ -224,7 +224,7 @@ async def get_folder_id_dict(ctx: Context) -> str:
         Dict pairing folder names and folder_ids
     """
     graph = ctx.request_context.lifespan_context.graph
-    folder_id_dict = await graph.get_mail_folder_id_dict()
+    folder_id_dict = await graph.mail.get_mail_folder_id_dict()
     return folder_id_dict
 
 @mcp.tool()
@@ -248,7 +248,7 @@ async def move_email_to_folder(ctx: Context, message_id: str=None, folder_id: st
     else:
         return "Please provide either a folder display name or folder ID"
 
-    move_successful = await graph.move_mail_to_folder(message_id=message_id, destination_folder_id=folder_id)
+    move_successful = await graph.mail.move_mail_to_folder(message_id=message_id, destination_folder_id=folder_id)
 
     if move_successful:
         return f"Email {message_id} moved to folder {folder_name}"
@@ -269,7 +269,7 @@ async def get_inbox_count(ctx: Context) -> str:
     """
 
     graph = ctx.request_context.lifespan_context.graph
-    inbox_count = await graph.get_inbox_count()
+    inbox_count = await graph.mail.get_inbox_count()
     if inbox_count is not None:
         return inbox_count
     else:
@@ -289,7 +289,7 @@ async def get_mail_with_mail_id(ctx: Context, message_id: str) -> str:
     """
 
     graph = ctx.request_context.lifespan_context.graph
-    mail = await graph.get_full_mail_by_id(message_id=message_id)
+    mail = await graph.mail.get_full_mail_by_id(message_id=message_id)
     if mail is not None:
         return mail
     else:
@@ -302,7 +302,7 @@ async def get_mail_with_mail_id(ctx: Context, message_id: str) -> str:
 async def get_mail_from_specific_folder(ctx: Context, folder_id: str, count: int=50) -> str:
     """Get all messages from a specific folder"""
     graph = ctx.request_context.lifespan_context.graph
-    message_page = await graph.get_mail_from_specific_mail_folder(folder_id=folder_id, count=count)
+    message_page = await graph.mail.get_mail_from_specific_mail_folder(folder_id=folder_id, count=count)
     result = "Recent emails in your inbox:\n\n"
 
     result += format_email_headers(message_page)
@@ -332,7 +332,7 @@ async def search_by_subject(ctx: Context, subject: str, folder_id: str = "inbox"
         folder_id=folder_id
     )
 
-    messages = await graph.search_mail(query)
+    messages = await graph.mail.search_mail(query)
     return format_email_headers(messages)
 
 
@@ -358,7 +358,7 @@ async def search_unread_emails(ctx: Context, folder_id: str = "inbox", count: in
         count=count
     )
 
-    messages = await graph.search_mail(query)
+    messages = await graph.mail.search_mail(query)
     return format_email_headers(messages)
 
 
@@ -411,7 +411,7 @@ async def advanced_mail_search(ctx: Context, search_query: Any) -> str:
         )
 
         # Execute the search
-        messages = await graph.search_mail(query)
+        messages = await graph.mail.search_mail(query)
 
         # Format and return results
         return format_email_headers(messages)
@@ -487,7 +487,7 @@ async def create_top_level_folder(ctx: Context, folder_name: str) -> str:
     graph = ctx.request_context.lifespan_context.graph
 
     try:
-        new_folder = await graph.create_mail_folder(display_name=folder_name)
+        new_folder = await graph.mail.create_mail_folder(display_name=folder_name)
 
         return f"Successfully created top-level folder '{folder_name}' with ID: {new_folder.id}"
     except Exception as e:
@@ -511,7 +511,7 @@ async def create_subfolder(ctx: Context, folder_name: str, parent_folder_id: str
     graph = ctx.request_context.lifespan_context.graph
 
     try:
-        new_folder = await graph.create_mail_folder(
+        new_folder = await graph.mail.create_mail_folder(
             display_name=folder_name,
             parent_folder_id=parent_folder_id
         )
@@ -573,7 +573,7 @@ async def compose_new_email(ctx: Context,
         cc_list = [email.strip() for email in cc_recipients.split(',') if email.strip()] if cc_recipients else None
         bcc_list = [email.strip() for email in bcc_recipients.split(',') if email.strip()] if bcc_recipients else None
 
-        result = await graph.create_new_email_for_draft_or_send(
+        result = await graph.mail.create_new_email_for_draft_or_send(
             to_recipients=to_list,
             subject=subject,
             body=body,
@@ -626,7 +626,7 @@ async def reply_to_email(ctx: Context,
         bcc_list = [email.strip() for email in bcc_recipients.split(',') if email.strip()] if bcc_recipients else None
         subject_param = subject if subject else None
 
-        await graph.reply_to_email(
+        await graph.mail.reply_to_email(
             message_id=message_id,
             body=body,
             reply_all=reply_all,
@@ -657,7 +657,7 @@ async def create_draft_reply(ctx: Context, message_id: str) -> str:
     graph = ctx.request_context.lifespan_context.graph
 
     try:
-        draft_reply = await graph.create_draft_reply(message_id=message_id)
+        draft_reply = await graph.mail.create_draft_reply(message_id=message_id)
 
         return f"Draft reply created successfully with ID: {draft_reply.id}"
 
@@ -705,7 +705,7 @@ async def update_draft_email(ctx: Context,
         if bcc_recipients is not None:
             bcc_list = [email.strip() for email in bcc_recipients.split(',') if email.strip()]
 
-        await graph.update_draft(
+        await graph.mail.update_draft(
             draft_id=draft_id,
             body=body,
             subject=subject,
@@ -736,7 +736,7 @@ async def send_draft_email(ctx: Context, draft_id: str) -> str:
     graph = ctx.request_context.lifespan_context.graph
 
     try:
-        success = await graph.send_draft(draft_id=draft_id)
+        success = await graph.mail.send_draft(draft_id=draft_id)
 
         if success:
             return "Draft email sent successfully"
@@ -776,7 +776,7 @@ async def update_mail_properties(ctx: Context,
     graph = ctx.request_context.lifespan_context.graph
 
     try:
-        result = await graph.update_mail_properties(
+        result = await graph.mail.update_mail_properties(
             message_id=message_id,
             is_read=is_read,
             categories=categories,
