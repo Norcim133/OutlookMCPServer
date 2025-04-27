@@ -1,13 +1,13 @@
 # OutlookMCPServer
 
-This project is an MCP server that gives Claude Desktop access to your Microsoft 365 mail (and soon, calendar) using the Microsoft Graph API.
+This project is an MCP server that gives Claude Desktop access to your Microsoft 365 mail, calendar, and (soon) files using the Microsoft Graph API.
 
 ---
 
 ## ✨ Features
 
-- ✅ **Mail access**: Search, filter, and analyze your inbox from Claude or any MCP-compatible agent
-- 🔜 **Calendar support**: Planned parity with mail features (querying, filtering, etc.)
+- ✅ **Mail access**: Compose, Respond, Sort, Search, Filter, and Analyze your inbox from Claude or any MCP-compatible agent
+- 🔜 **Calendar support**: List by date, Compose, Delete mails (coming soon: UpdateMail, Search)
 - 🚧 **OneDrive support**: Possible future direction after mail and calendar are robust
 
 ---
@@ -130,7 +130,7 @@ NOTE: You may need to replace "uv" with an absolute reference in "command"
 ## 📌 Roadmap
 - Mail integration (DONE)
 - Auth in Claude Desktop (DONE)
-- Calendar integration (Started)
+- Calendar integration (CORE DONE)
 - Optional OneDrive integration
 - Windows support
 ---
