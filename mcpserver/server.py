@@ -194,7 +194,7 @@ async def get_mail_folder_name_with_id(ctx: Context, folder_id: str) -> str:
 
 @mcp.tool()
 @requires_graph_auth
-async def get_folders_and_inbox_mails_for_sort_planning(ctx: Context) -> str:
+async def get_folders_and_inbox_mails_for_sort_planning(ctx: Context) -> base.UserMessage:
     """Get the current available folder structure for mails and get mails in the inbox with guidance on how to plan sorting
 
     Args:
@@ -205,7 +205,7 @@ async def get_folders_and_inbox_mails_for_sort_planning(ctx: Context) -> str:
     """
     inbox_messages = await list_inbox_messages(ctx)
     folders = await list_email_folders(ctx)
-    return [base.UserMessage(f"""
+    return base.UserMessage(f"""
     You are an email organization assistant. Your task is to:
 
     1. Take all email folders: {folders}
@@ -216,7 +216,7 @@ async def get_folders_and_inbox_mails_for_sort_planning(ctx: Context) -> str:
     6. If a folder is ambiguous get the folder id from the folder_id_dict and get_mail_from_specific_folder to see which emails are in that folder.
 
     Provide a clear, organized response in a table that lists each email and your folder recommendation.
-    """)]
+    """)
 
 @mcp.tool()
 @requires_graph_auth
@@ -326,7 +326,6 @@ async def search_by_subject(ctx: Context, subject: str, folder_id: str = "inbox"
         ctx: FastMCP Context
         subject: The subject text to search for
         folder_id: The folder ID to search in (default: inbox)
-        count: Maximum number of emails to return
 
     Returns:
         A list of matching emails
@@ -551,11 +550,11 @@ async def get_user(ctx: Context, all_properties: bool = False) -> str:
 @requires_graph_auth
 async def compose_new_email(ctx: Context,
                             to_recipients: str,
-                            subject: str,
-                            body: str,
-                            cc_recipients: str = "",
-                            bcc_recipients: str = "",
-                            save_as_draft: bool = False) -> str:
+                            subject: Optional[str] = None,
+                            body_with_html_tags: Optional[str] = "None",
+                            cc_recipients: Optional[str] = "",
+                            bcc_recipients: Optional[str] = "",
+                            save_as_draft: Optional[bool] = True) -> str:
     """
     Compose a new email with html formatting and either send it or save as draft
 
@@ -563,7 +562,7 @@ async def compose_new_email(ctx: Context,
         ctx: FastMCP Context
         to_recipients: Comma-separated list of email addresses
         subject: Subject line of the email
-        body: Content of the email (defaul HTML formatting)
+        body_with_html_tags: Content of the email (default HTML formatting)
         cc_recipients: Comma-separated list of CC email addresses (optional)
         bcc_recipients: Comma-separated list of BCC email addresses (optional)
         save_as_draft: If true, saves to Drafts folder; if false, sends immediately
@@ -572,6 +571,7 @@ async def compose_new_email(ctx: Context,
         Status message with result
     """
     graph = ctx.request_context.lifespan_context.graph
+    body = body_with_html_tags # Parameter name required to keep Claude reverting to plain text default 
 
     try:
         # Parse recipient lists
@@ -601,19 +601,19 @@ async def compose_new_email(ctx: Context,
 @requires_graph_auth
 async def reply_to_email(ctx: Context,
                          message_id: str,
-                         body: str,
-                         reply_all: bool = False,
-                         to_recipients: str = "",
-                         cc_recipients: str = "",
-                         bcc_recipients: str = "",
-                         subject: str = "") -> str:
+                         body_with_html_tags: Optional[str],
+                         reply_all: Optional[bool] = False,
+                         to_recipients: Optional[str] = "",
+                         cc_recipients: Optional[str] = "",
+                         bcc_recipients: Optional[str] = "",
+                         subject: Optional[str] = "") -> str:
     """
     Reply to an existing email with html formatting and send immediately
 
     Args:
         ctx: FastMCP Context
         message_id: ID of the message to reply to
-        body: Content of the reply (default to HTML formatting)
+        body_with_html_tags: Content of the reply (default to HTML formatting)
         reply_all: If true, includes all original recipients; if false, replies only to sender
         to_recipients: Optional comma-separated additional recipients (leave empty to use default recipients)
         cc_recipients: Optional comma-separated CC recipients
@@ -624,6 +624,7 @@ async def reply_to_email(ctx: Context,
         Status message with result
     """
     graph = ctx.request_context.lifespan_context.graph
+    body = body_with_html_tags # Parameter name required to keep Claude reverting to plain text default 
 
     try:
         # Parse recipient lists
@@ -675,7 +676,7 @@ async def create_draft_reply(ctx: Context, message_id: str) -> str:
 @requires_graph_auth
 async def update_draft_email(ctx: Context,
                              draft_id: str,
-                             body: Optional[str] = None,
+                             body_with_html_tags: Optional[str] = None,
                              subject: Optional[str] = None,
                              to_recipients: Optional[str] = None,
                              cc_recipients: Optional[str] = None,
@@ -686,7 +687,7 @@ async def update_draft_email(ctx: Context,
     Args:
         ctx: FastMCP Context
         draft_id: ID of the draft message to update
-        body: New html formatted content for the email (optional); if you want to add html formatted content to existing content, include the original with your edits
+        body_with_html_tags: New html formatted content for the email (optional); if you want to add html formatted content to existing content, include the original with your edits
         subject: New subject line (optional); if you want to add to existing subject, include the original with your edits
         to_recipients: New comma-separated list of recipients (optional); if you want to add to existing recipients, include the original with your edits
         cc_recipients: New comma-separated list of CC recipients (optional); if you want to add to existing cc_recipients, include the original with your edits
@@ -696,6 +697,7 @@ async def update_draft_email(ctx: Context,
         Status message with result
     """
     graph = ctx.request_context.lifespan_context.graph
+    body = body_with_html_tags # Parameter name required to keep Claude reverting to plain text default 
 
     try:
         # Parse recipient lists if provided
@@ -890,7 +892,7 @@ async def create_calendar_event(ctx: Context,
                                 subject: Optional[str],
                                 start_datetime: str,
                                 end_datetime: str,
-                                body: Optional[str] = "",
+                                body_with_html_tags: Optional[str] = "",
                                 location: Optional[str] = None,
                                 is_online_meeting: Optional[bool] = False,
                                 attendees: Optional[str] = "") -> str:
@@ -902,7 +904,7 @@ async def create_calendar_event(ctx: Context,
         subject: Subject of the event
         start_datetime: Start time in format "YYYY-MM-DDTHH:MM:SS"
         end_datetime: End time in format "YYYY-MM-DDTHH:MM:SS"
-        body: Body content of the event (default should be HTML); if the event is a meeting, language should make sense for both parties (i.e. instructions should be for everyone from neutral person)
+        body_with_html_tags: Body content of the event (default should be HTML); if the event is a meeting, language should make sense for both parties (i.e. instructions should be for everyone from neutral person)
         location: Optional location name
         is_online_meeting: Whether to make this a Teams online meeting
         attendees: Optional comma-separated list of attendee emails
@@ -911,6 +913,7 @@ async def create_calendar_event(ctx: Context,
         A confirmation message with the created event details
     """
     graph = ctx.request_context.lifespan_context.graph
+    body = body_with_html_tags # Parameter name required to keep Claude reverting to plain text default 
 
     try:
         # Parse attendees if provided
