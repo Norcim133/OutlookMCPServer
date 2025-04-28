@@ -10,20 +10,24 @@ import json
 
 
 APP_INSTRUCTIONS = """
-You are an expert email assistant with full access to the user's Microsoft365 email account via the OutlookMCP server.
+You are a hyper intelligent tech user who has full access to the user's Microsoft365 email account via the OutlookMCP server.
 
 You can:
 - Read emails from any folder
 - Classify or organize emails based on content or sender or other metadata
-- Compose, draft, or reply to emails
+- Compose, draft, or reply to emails using html formatting
 - Search by subject, body, sender, or metadata
 - Create and manage folders
 - Help the user stay organized and responsive
+- Get calendar events and meetings
+- Create events and invites
 
-Do not hallucinate data. Use tools to fetch actual messages or folders.
+By default for mail, use html formatting. Do not hallucinate data. Use MCP tools to fetch actual messages or folders.
 When unsure which folder an email belongs to, inspect the email body and/or compare the content with other mails already in the folder.
 
 Always be helpful, privacy-conscious, and structured in your reasoning.
+
+IMPORTANT: Always use html formatting for the body of emails and calendar events. Do not hallucinate date.
 """
 
 # Create an MCP server
@@ -553,13 +557,13 @@ async def compose_new_email(ctx: Context,
                             bcc_recipients: str = "",
                             save_as_draft: bool = False) -> str:
     """
-    Compose a new email and either send it or save as draft
+    Compose a new email with html formatting and either send it or save as draft
 
     Args:
         ctx: FastMCP Context
         to_recipients: Comma-separated list of email addresses
         subject: Subject line of the email
-        body: Content of the email (can include HTML formatting)
+        body: Content of the email (defaul HTML formatting)
         cc_recipients: Comma-separated list of CC email addresses (optional)
         bcc_recipients: Comma-separated list of BCC email addresses (optional)
         save_as_draft: If true, saves to Drafts folder; if false, sends immediately
@@ -604,12 +608,12 @@ async def reply_to_email(ctx: Context,
                          bcc_recipients: str = "",
                          subject: str = "") -> str:
     """
-    Reply to an existing email and send immediately
+    Reply to an existing email with html formatting and send immediately
 
     Args:
         ctx: FastMCP Context
         message_id: ID of the message to reply to
-        body: Content of the reply (can include HTML formatting)
+        body: Content of the reply (default to HTML formatting)
         reply_all: If true, includes all original recipients; if false, replies only to sender
         to_recipients: Optional comma-separated additional recipients (leave empty to use default recipients)
         cc_recipients: Optional comma-separated CC recipients
@@ -677,12 +681,12 @@ async def update_draft_email(ctx: Context,
                              cc_recipients: Optional[str] = None,
                              bcc_recipients: Optional[str] = None) -> str:
     """
-    Update an existing draft email (Note: anything entered will overwrite existing content so be sure to include old content if needed))
+    Update an existing draft email with html formatting (Note: anything entered will overwrite existing content so be sure to include old content if needed))
 
     Args:
         ctx: FastMCP Context
         draft_id: ID of the draft message to update
-        body: New content for the email (optional); if you want to add to existing content, include the original with your edits
+        body: New html formatted content for the email (optional); if you want to add html formatted content to existing content, include the original with your edits
         subject: New subject line (optional); if you want to add to existing subject, include the original with your edits
         to_recipients: New comma-separated list of recipients (optional); if you want to add to existing recipients, include the original with your edits
         cc_recipients: New comma-separated list of CC recipients (optional); if you want to add to existing cc_recipients, include the original with your edits
@@ -891,14 +895,14 @@ async def create_calendar_event(ctx: Context,
                                 is_online_meeting: Optional[bool] = False,
                                 attendees: Optional[str] = "") -> str:
     """
-    Create a new calendar event
+    Create a new calendar event with html formatting in body
 
     Args:
         ctx: FastMCP Context
         subject: Subject of the event
         start_datetime: Start time in format "YYYY-MM-DDTHH:MM:SS"
         end_datetime: End time in format "YYYY-MM-DDTHH:MM:SS"
-        body: Body content of the event (can include HTML)
+        body: Body content of the event (default should be HTML); if the event is a meeting, language should make sense for both parties (i.e. instructions should be for everyone from neutral person)
         location: Optional location name
         is_online_meeting: Whether to make this a Teams online meeting
         attendees: Optional comma-separated list of attendee emails
@@ -967,6 +971,47 @@ async def delete_calendar_event(ctx: Context, event_id: str, notify_attendees: b
         return f"Event successfully deleted {notification_status} attendee notification: '{event_subject}' (ID: {event_id})"
     except Exception as e:
         return f"Error deleting calendar event: {str(e)}"
+
+
+@mcp.tool()
+async def get_current_datetime(ctx: Context) -> str:
+    """
+    Get the current date and time in various formats
+
+    Args:
+        ctx: FastMCP Context
+
+    Returns:
+        A string with current date and time information in different formats
+    """
+    from datetime import datetime, timezone
+
+    # Get current time in UTC
+    utc_now = datetime.now(timezone.utc)
+
+    # Get local time
+    local_now = datetime.now()
+
+    # Format the times in different ways
+    result = "Current Date and Time Information:\n\n"
+    result += f"UTC Date and Time: {utc_now.strftime('%Y-%m-%d %H:%M:%S %Z')}\n"
+    result += f"Local Date and Time: {local_now.strftime('%Y-%m-%d %H:%M:%S')}\n"
+    result += f"ISO Format UTC: {utc_now.isoformat()}\n"
+    result += f"Calendar-friendly Date: {local_now.strftime('%A, %B %d, %Y')}\n"
+    result += f"Time: {local_now.strftime('%I:%M %p')}\n"
+
+    # Add date components that might be useful for calendar operations
+    result += "\nDate Components:\n"
+    result += f"Year: {local_now.year}\n"
+    result += f"Month number: {local_now.month}\n"
+    result += f"Month name: {local_now.strftime('%B')}\n"
+    result += f"Day: {local_now.day}\n"
+    result += f"Hour: {local_now.hour}\n"
+    result += f"Minute: {local_now.minute}\n"
+    result += f"Second: {local_now.second}\n"
+    result += f"Day name: {local_now.strftime('%A')}\n"
+
+    return result
 
 ##########################
 
