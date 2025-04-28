@@ -194,7 +194,7 @@ async def get_mail_folder_name_with_id(ctx: Context, folder_id: str) -> str:
 
 @mcp.tool()
 @requires_graph_auth
-async def get_folders_and_inbox_mails_for_sort_planning(ctx: Context) -> str:
+async def get_folders_and_inbox_mails_for_sort_planning(ctx: Context) -> base.UserMessage:
     """Get the current available folder structure for mails and get mails in the inbox with guidance on how to plan sorting
 
     Args:
@@ -205,7 +205,7 @@ async def get_folders_and_inbox_mails_for_sort_planning(ctx: Context) -> str:
     """
     inbox_messages = await list_inbox_messages(ctx)
     folders = await list_email_folders(ctx)
-    return [base.UserMessage(f"""
+    return base.UserMessage(f"""
     You are an email organization assistant. Your task is to:
 
     1. Take all email folders: {folders}
@@ -216,7 +216,7 @@ async def get_folders_and_inbox_mails_for_sort_planning(ctx: Context) -> str:
     6. If a folder is ambiguous get the folder id from the folder_id_dict and get_mail_from_specific_folder to see which emails are in that folder.
 
     Provide a clear, organized response in a table that lists each email and your folder recommendation.
-    """)]
+    """)
 
 @mcp.tool()
 @requires_graph_auth
@@ -326,7 +326,6 @@ async def search_by_subject(ctx: Context, subject: str, folder_id: str = "inbox"
         ctx: FastMCP Context
         subject: The subject text to search for
         folder_id: The folder ID to search in (default: inbox)
-        count: Maximum number of emails to return
 
     Returns:
         A list of matching emails
