@@ -107,7 +107,7 @@ def format_email_headers(message_page):
             result += f"   Message ID: {message.id}\n\n"
 
     else:
-        result += "No messages found in the inbox."
+        result += "No messages found in the folder."
 
     return result
 
@@ -217,6 +217,54 @@ async def get_folders_and_inbox_mails_for_sort_planning(ctx: Context) -> base.Us
 
     Provide a clear, organized response in a table that lists each email and your folder recommendation.
     """)
+
+
+@mcp.prompt()
+async def sort_inbox(arguments=None):
+    """
+    Automatically organize your inbox to achieve inbox zero by processing calendar invites,
+    filing important emails, and organizing remaining messages.
+    """
+    return [
+        {
+            "role": "user",
+            "content": {
+                "type": "text",
+                "text": """
+Please help me sort my inbox to achieve inbox zero by following these steps:
+
+0. First, get ready for the requests mail and calendar actions:
+   - List email folders so you can see the email hierarchy
+   - Get folder id dict: So can match folder names to folder ids
+
+1. Next, identify calendar invites and messages with scheduling requests:
+   - For calendar invites: Check my calendar for conflicts, then either accept, draft a response, or draft counter-proposals
+   - Looking for meeting requests without formal invites: If a mail header is from an individual and the subject looks conversational instead of like marketing, get the full email content to check it for meeting requests
+   - If you checked a message content and it did not have a meeting request, file it in the relevant folder as per normal rules below
+   - For meeting requests without formal invites: Check my calendar and draft calendar invites with appropriate details
+
+2. Next, identify important emails for filing in the Important folder:
+   - Look for emails from key contacts (threads I've responded to, clients, team members)
+   - Identify emails with urgent subject lines or time-sensitive content or suggesting an action
+   - Move these to my "Important" folder using move_email_to_folder
+
+3. For all remaining emails:
+   - Analyze the content, sender, and subject
+   - Move each email to the most appropriate folder based on its content
+   - If the mail header is ambiguous, use the email_id to get_mail_with_mail_id and read content to determine the correct folder
+   - Use get_mail_from_specific_folder if needed to see what kinds of emails are in different folders
+
+4. Only pause to ask me questions if:
+   - You're truly uncertain which folder is appropriate
+   - You've found emails requiring a decision
+   - You need clarification on a scheduling conflict
+
+Take action immediately without asking for approval first. Use all available tools including get_folders_and_inbox_mails_for_sort_planning, get_folder_id_dict, get_mail_with_mail_id, and move_email_to_folder. When you're done, provide a summary of what you did, including how many emails you processed, where you moved them, and any draft responses or calendar events you created.
+                """
+            }
+        }
+    ]
+
 
 @mcp.tool()
 @requires_graph_auth
