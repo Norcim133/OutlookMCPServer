@@ -15,6 +15,7 @@ class GraphController:
         self.user_client = user_client
         self._mail_service = None
         self._calendar_service = None
+        self._files_service = None
 
     @property
     def mail(self):
@@ -26,6 +27,17 @@ class GraphController:
             from mcpserver.graph.mail_service import MailService
             self._mail_service = MailService(self.user_client)
         return self._mail_service
+
+    @property
+    def files(self):
+        """
+        Get the files service instance.
+        Lazy-loads the service on first access.
+        """
+        if self._files_service is None:
+            from mcpserver.graph.files_service import FilesService
+            self._files_service = FilesService(self.user_client)
+        return self._files_service
 
     @property
     def calendar(self):
