@@ -14,12 +14,12 @@ def requires_graph_auth(func: Callable) -> Callable:
         auth_settings = ctx.request_context.lifespan_context.settings
 
         # Check if we already have a client
-        graph_client = auth_settings.get_user_client()
+        user_client = auth_settings.get_user_client()
 
-        if graph_client is not None:
+        if user_client is not None:
             # We're authenticated, proceed with the function
             logging.info("Already authenticated, proceeding with function")
-            ctx.request_context.lifespan_context.graph.user_client = graph_client
+            ctx.request_context.lifespan_context.graph.user_client = user_client
             return await func(ctx, *args, **kwargs)
         else:
             # We need to authenticate - return instructions

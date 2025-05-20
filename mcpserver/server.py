@@ -1,6 +1,6 @@
 from mcp.server.fastmcp import FastMCP, Context
 from mcp.server.fastmcp.prompts import base
-from msgraph.generated.models.drive_item import DriveItem
+
 
 from mcpserver.calendar_formatting import format_event_page
 from mcpserver.auth_wrapper import requires_graph_auth
@@ -8,8 +8,8 @@ from mcpserver.context_manager import app_lifespan
 from mcpserver.mail_query import MailQuery
 from typing import Any, Optional, List
 import json
-from msgraph.generated.models.site import Site
-from msgraph.generated.models.drive import Drive
+import logging
+import os
 
 APP_INSTRUCTIONS = """
 You are a hyper intelligent tech user who has full access to the user's Microsoft365 email account via the OutlookMCP server.
@@ -479,7 +479,7 @@ async def advanced_mail_search(ctx: Context, search_query: Any) -> str:
 
 @mcp.tool()
 @requires_graph_auth
-async def get_available_search_properties(ctx: Context) -> str:
+async def get_available_mail_search_properties(ctx: Context) -> str:
     """
     Get search guidance and resolve search query errors
 
@@ -528,7 +528,7 @@ To use these properties, create a JSON object with your desired search criteria 
 
 @mcp.tool()
 @requires_graph_auth
-async def create_top_level_folder(ctx: Context, folder_name: str) -> str:
+async def create_top_level_mail_folder(ctx: Context, folder_name: str) -> str:
     """
     Create a new top-level folder in your mailbox
 
@@ -551,7 +551,7 @@ async def create_top_level_folder(ctx: Context, folder_name: str) -> str:
 
 @mcp.tool()
 @requires_graph_auth
-async def create_subfolder(ctx: Context, folder_name: str, parent_folder_id: str) -> str:
+async def create_mail_subfolder(ctx: Context, folder_name: str, parent_folder_id: str) -> str:
     """
     Create a subfolder within an existing mail folder
 
@@ -621,7 +621,7 @@ async def compose_new_email(ctx: Context,
         Status message with result
     """
     graph = ctx.request_context.lifespan_context.graph
-    body = body_with_html_tags # Parameter name required to keep Claude reverting to plain text default 
+    body = body_with_html_tags # Parameter name required to keep Claude reverting to plain text default
 
     try:
         # Parse recipient lists
@@ -674,7 +674,7 @@ async def reply_to_email(ctx: Context,
         Status message with result
     """
     graph = ctx.request_context.lifespan_context.graph
-    body = body_with_html_tags # Parameter name required to keep Claude reverting to plain text default 
+    body = body_with_html_tags # Parameter name required to keep Claude reverting to plain text default
 
     try:
         # Parse recipient lists
@@ -747,7 +747,7 @@ async def update_draft_email(ctx: Context,
         Status message with result
     """
     graph = ctx.request_context.lifespan_context.graph
-    body = body_with_html_tags # Parameter name required to keep Claude reverting to plain text default 
+    body = body_with_html_tags # Parameter name required to keep Claude reverting to plain text default
 
     try:
         # Parse recipient lists if provided
@@ -963,7 +963,7 @@ async def create_calendar_event(ctx: Context,
         A confirmation message with the created event details
     """
     graph = ctx.request_context.lifespan_context.graph
-    body = body_with_html_tags # Parameter name required to keep Claude reverting to plain text default 
+    body = body_with_html_tags # Parameter name required to keep Claude reverting to plain text default
 
     try:
         # Parse attendees if provided
@@ -1073,40 +1073,17 @@ async def list_followed_sites(ctx: Context):
     Retrieves a list of SharePoint sites that the current user is following,
     returning their display names, IDs, and web URLs.
     """
+    files = ctx.request_context.lifespan_context.graph.files
     try:
-        user_client = ctx.request_context.lifespan_context.graph.user_client
-        followed_sites_response = await user_client.me.followed_sites.get()
-
-        if not followed_sites_response or not followed_sites_response.value:
-            return "No sites are currently being followed by the user."
-
-        sites_info = []
-        for site_obj in followed_sites_response.value:
-
-            site_id = getattr(site_obj, 'id', None)
-            display_name = getattr(site_obj, 'display_name', 'Unknown Site Name')
-            web_url = getattr(site_obj, 'web_url', None)
-
-            if site_id:  # Only include sites that have an ID
-                sites_info.append({
-                    "id": site_id,
-                    "display_name": display_name,
-                    "web_url": web_url
-                })
-
-        if not sites_info:
-            return "Followed sites were found, but essential information (like ID) is missing."
-
+        sites_info = await files.list_followed_sites()
         return sites_info
     except Exception as e:
-        import traceback  # Good for server-side logging during development
-        traceback.print_exc()
         return f"Error retrieving followed sites: {str(e)}"
 
 
 @mcp.tool()
 @requires_graph_auth
-async def get_site_drives(ctx: Context, site_id: str):
+async def get_site_drives(ctx: Context, site_id: str = os.environ.get("FULL_SHAREPOINT_SITE_ID")):
     """
     Retrieves the list of drives (document libraries) for a given SharePoint site ID.
 
@@ -1119,52 +1096,18 @@ async def get_site_drives(ctx: Context, site_id: str):
     """
     if not site_id:
         return "Error: A site_id must be provided to get its drives."
+    files = ctx.request_context.lifespan_context.graph.files
     try:
-        user_client = ctx.request_context.lifespan_context.graph.user_client
-
-        site_drives_response = await user_client.sites.by_site_id(site_id).drives.get()
-
-        if not site_drives_response or not site_drives_response.value:
-            return f"No drives (document libraries) found for site ID '{site_id}'."
-
-        drives_info = []
-        for drive_obj in site_drives_response.value:
-            drive_id = getattr(drive_obj, 'id', None)
-            drive_name = getattr(drive_obj, 'name', 'Unknown Drive Name')
-            drive_web_url = getattr(drive_obj, 'web_url', None)
-
-            if drive_id:  # Only include drives that have an ID
-                drives_info.append({
-                    "id": drive_id,
-                    "name": drive_name,
-                    "web_url": drive_web_url
-                })
+        drives_info = await files.get_site_drives(site_id)
 
         if not drives_info:
             return f"Drives were found for site ID '{site_id}', but essential information (like ID) is missing."
 
         return drives_info
     except Exception as e:
-        import traceback
-        traceback.print_exc()
         return f"Error retrieving drives for site ID '{site_id}': {str(e)}"
 
-def get_drive_item_meta_data(drive_item_list: DriveItem):
-    items_list = []
-    for item in drive_item_list.value:
-        item_type = "Folder" if getattr(item, 'folder', None) else (
-            "File" if getattr(item, 'file', None) else "Unknown")
-        items_list.append({
-            "id": getattr(item, 'id', None),
-            "name": getattr(item, 'name', 'Unknown Item Name'),
-            "type": item_type,
-            "size": getattr(item, 'size', 0),  # Size in bytes
-            "web_url": getattr(item, 'web_url', None),
-            "last_modified_date_time": str(getattr(item, 'last_modified_date_time', None))
-            # Convert datetime to string
-        })
 
-    return items_list
 
 @mcp.tool()
 @requires_graph_auth
@@ -1181,23 +1124,15 @@ async def list_drive_root_items(ctx: Context, drive_id: str):
     """
     if not drive_id:
         return "Error: A drive_id must be provided to list its root items."
+
+    files = ctx.request_context.lifespan_context.graph.files
     try:
-        user_client = ctx.request_context.lifespan_context.graph.user_client
 
-        root_drive_item = await user_client.drives.by_drive_id(drive_id).root.get()
+        root_drive_item = await files.list_drive_root_items(drive_id)
 
-        drive_item_id = getattr(root_drive_item, 'id', None)
-
-        root_items_response = await user_client.drives.by_drive_id(drive_id).items.by_drive_item_id(drive_item_id).children.get()
-
-        if not root_items_response or not root_items_response.value:
-            return f"No items found in the root of drive ID '{drive_id}'."
-
-        return get_drive_item_meta_data(root_items_response)
+        return root_drive_item
 
     except Exception as e:
-        import traceback
-        traceback.print_exc()
         return f"Error listing root items for drive ID '{drive_id}': {str(e)}"
 
 
@@ -1220,100 +1155,95 @@ async def list_drive_folder_items(ctx: Context, drive_id: str, folder_item_id: s
     if not folder_item_id:
         return "Error: A folder_item_id must be provided."
 
+    files = ctx.request_context.lifespan_context.graph.files
     try:
-        user_client = ctx.request_context.lifespan_context.graph.user_client
-
-        folder_children_response = await user_client.drives.by_drive_id(drive_id).items.by_drive_item_id(
-            folder_item_id).children.get()
-
-        if not folder_children_response or not folder_children_response.value:
-            # It's normal for a folder to be empty, so this might not be an "error" for the LLM
-            return f"No items found in folder ID '{folder_item_id}' within drive ID '{drive_id}'. (Folder might be empty)"
-
-        return get_drive_item_meta_data(folder_children_response)
+        drive_item_metadata = await files.list_drive_folder_items(drive_id, folder_item_id)
+        return drive_item_metadata
 
     except Exception as e:
-        import traceback
-        traceback.print_exc()
         return f"Error listing items in folder ID '{folder_item_id}' for drive ID '{drive_id}': {str(e)}"
 
 @mcp.tool()
 @requires_graph_auth
 async def get_organization_id(ctx: Context):
-    user_client = ctx.request_context.lifespan_context.graph.user_client
-    org = await user_client.organization.get()
-    return org
+    files = ctx.request_context.lifespan_context.graph.files
+    try:
+        org_id = await files.get_organization_id()
+        return org_id
+    except Exception as e:
+        return f"Error retrieving organization ID: {str(e)}"
 
 @mcp.tool()
 @requires_graph_auth
 async def get_site_id_from_user(ctx: Context, site_index: int = 0):
+    files = ctx.request_context.lifespan_context.graph.files
     try:
-        user_client = ctx.request_context.lifespan_context.graph.user_client
-        followed_sites_response = await user_client.me.followed_sites.get()
+        site_id = await files.get_site_id_from_user(site_index)
 
-        if not followed_sites_response or not followed_sites_response.value or len(followed_sites_response.value) <= site_index:
-            return f"Error: Could not find followed site at index {site_index}."
-
-        return followed_sites_response.value[0]
+        return site_id
     except Exception as e:
         return f"Error retrieving followed sites: {str(e)}"
 
-@mcp.tool()
-@requires_graph_auth
-async def get_org_sites(ctx: Context):
-    user_client = ctx.request_context.lifespan_context.graph.user_client
-    get_organization_id(ctx)
-    sites = await user_client.organization.sites.get()
-    return sites
 
 @mcp.tool()
 @requires_graph_auth
 async def get_user_drives(ctx: Context):
-    user_client = ctx.request_context.lifespan_context.graph.user_client
-    drive_list = await user_client.me.drives.get()
-    return drive_list
+    files = ctx.request_context.lifespan_context.graph.files
+    try:
+        drives = await files.get_user_drives()
+        return drives
+    except Exception as e:
+        return f"Error retrieving user drives: {str(e)}"
 
 @mcp.tool()
 @requires_graph_auth
 async def get_user_drive(ctx: Context):
-    user_client = ctx.request_context.lifespan_context.graph.user_client
-
-    drive_list = await user_client.me.drive.get()
-    return drive_list
+    files = ctx.request_context.lifespan_context.graph.files
+    try:
+        user_drive = await files.get_user_drive()
+        return user_drive
+    except Exception as e:
+        return f"Error retrieving user drive: {str(e)}"
 
 @mcp.tool()
 @requires_graph_auth
-async def get_my_drive_id(ctx: Context):
-    drive = await get_user_drive(ctx)
-    drive_id = drive.id
-    return drive_id
+async def get_user_drive_id(ctx: Context):
+    files = ctx.request_context.lifespan_context.graph.files
+    try:
+        drive_id = await files.get_user_drive_id()
+        return drive_id
+    except Exception as e:
+        return f"Error retrieving user drive ID: {str(e)}"
 
 @mcp.tool()
 @requires_graph_auth
 async def get_root_drive_item(ctx: Context):
-    user_client = ctx.request_context.lifespan_context.graph.user_client
-
-    drive_id = await get_my_drive_id(ctx)
-    result = await user_client.drives.by_drive_id(drive_id).root.get()
-    return result
+    files = ctx.request_context.lifespan_context.graph.files
+    try:
+        drive_item = await files.get_root_drive_item()
+        return drive_item
+    except Exception as e:
+        return f"Error retrieving root drive item: {str(e)}"
 
 @mcp.tool()
 @requires_graph_auth
 async def get_root_drive_item_id_for_user(ctx: Context):
-    drive_item = await get_root_drive_item(ctx)
-    drive_item_id = drive_item.id
-    return drive_item_id
-
+    files = ctx.request_context.lifespan_context.graph.files
+    try:
+        root_drive_item_id = await files.get_root_drive_item_id_for_user()
+        return root_drive_item_id
+    except Exception as e:
+        return f"Error retrieving root drive item ID for the current user: {str(e)}"
 
 @mcp.tool()
 @requires_graph_auth
 async def get_files(ctx: Context, drive_id: str, drive_item_id: str):
-    import json
-    user_client = ctx.request_context.lifespan_context.graph.user_client
-
-    result = await user_client.drives.by_drive_id(drive_id).items.by_drive_item_id(drive_item_id).children.get()
-    return json.dumps(str(result), indent=4)
-
+    files = ctx.request_context.lifespan_context.graph.files
+    try:
+        files_info = await files.get_files(drive_id, drive_item_id)
+        return files_info
+    except Exception as e:
+        return f"Error retrieving files for drive ID '{drive_id}' and drive item ID '{drive_item_id}': {str(e)}"
 
 @mcp.tool()
 @requires_graph_auth
@@ -1329,62 +1259,36 @@ async def search_my_drive(ctx: Context, query: str, drive_id: str):
     Returns:
         Search results from OneDrive
     """
+    files = ctx.request_context.lifespan_context.graph.files
     try:
-        user_client = ctx.request_context.lifespan_context.graph.user_client
-
-        # Create request configuration with query parameters
-        from kiota_abstractions.base_request_configuration import RequestConfiguration
-
-        request_config = RequestConfiguration()
-        request_config.query_parameters = {
-            "$select": "name,id,webUrl,size,file,folder,parentReference"
-        }
-
-        # Perform the search
-        search_results = await user_client.drives.by_drive_id(drive_id).search_with_q("{query}").get()
-
+        search_results = await files.search_my_drive(query, drive_id)
         return search_results
-        # Format the results nicely
-        result = f"Search results for '{query}':\n\n"
-
-        if search_results and hasattr(search_results, 'value') and search_results.value:
-            for i, item in enumerate(search_results.value, 1):
-                result += f"{i}. {item.name}\n"
-
-                # Add type info
-                if hasattr(item, 'folder') and item.folder:
-                    result += f"   Type: Folder\n"
-                    if hasattr(item.folder, 'child_count'):
-                        result += f"   Contains: {item.folder.child_count} items\n"
-                elif hasattr(item, 'file') and item.file:
-                    result += f"   Type: File\n"
-                    if hasattr(item.file, 'mime_type'):
-                        result += f"   MIME Type: {item.file.mime_type}\n"
-
-                # Add size info
-                if hasattr(item, 'size'):
-                    size_kb = item.size / 1024
-                    if size_kb < 1024:
-                        result += f"   Size: {size_kb:.1f} KB\n"
-                    else:
-                        size_mb = size_kb / 1024
-                        result += f"   Size: {size_mb:.1f} MB\n"
-
-                # Add URL
-                if hasattr(item, 'web_url'):
-                    result += f"   URL: {item.web_url}\n"
-
-                # Add ID
-                if hasattr(item, 'id'):
-                    result += f"   ID: {item.id}\n"
-
-                result += "\n"
-        else:
-            result += "No results found."
-
-        return result
     except Exception as e:
-        return f"Error searching OneDrive: {str(e)}"
+        return f"Error searching my drive: {str(e)}"
+
+@mcp.tool()
+@requires_graph_auth
+async def get_drive_root_folder_id(ctx: Context, drive_id: str):
+    """
+    Gets the ID of the root folder (DriveItem) for a given drive.
+    This ID can be used as a folder_id to read from the root of a drive.
+
+    Args:
+        ctx: FastMCP Context
+        drive_id: The ID of the drive.
+
+    Returns:
+        The ID of the root DriveItem or an error message.
+    """
+    if not drive_id:
+        return "Error: A drive_id must be provided."
+    files = ctx.request_context.lifespan_context.graph.files
+    try:
+        root_drive_id = await files.get_drive_root_folder_id(drive_id)
+        return root_drive_id
+    except Exception as e:
+        return f"Error getting the root folder ID for the drive ID '{drive_id}': {str(e)}"
+
 
 
 ##########################
