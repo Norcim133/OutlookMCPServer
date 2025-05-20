@@ -1289,9 +1289,58 @@ async def get_drive_root_folder_id(ctx: Context, drive_id: str):
     except Exception as e:
         return f"Error getting the root folder ID for the drive ID '{drive_id}': {str(e)}"
 
+@mcp.tool()
+@requires_graph_auth
+async def read_sharepoint_files(
+        ctx: Context,
+        full_sharepoint_site_id: str = os.getenv("FULL_SHAREPOINT_SITE_ID"),
+        sharepoint_site_name: str = os.getenv("SHAREPOINT_SITE_NAME"),
+        drive_id: str = os.getenv("TOP_LEVEL_DRIVE_ID"),
+        drive_name: str = os.getenv("TOP_LEVEL_DRIVE_NAME"),
+        folder_id: str = os.getenv("TARGET_FOLDER_ID"),
+        folder_name: str = os.getenv("TARGET_FOLDER_NAME")
+    ):
+    from llama_index.readers.microsoft_sharepoint import SharePointReader
+
+    auth_settings = ctx.request_context.lifespan_context.settings
+    client_id = auth_settings.client_id
+    client_secret = auth_settings.client_secret
+    tenant_id = auth_settings.tenant_id
+
+    logger = logging.getLogger(__name__)
+
+    sharepoint_reader = SharePointReader(
+        client_id=client_id,
+        client_secret=client_secret,
+        tenant_id=tenant_id,
+        sharepoint_site_id=full_sharepoint_site_id,
+        sharepoint_site_name=sharepoint_site_name,
+        drive_name=drive_name,
+        sharepoint_folder_path=folder_name #It just needs the path relative to the drive (in this case, the folder name)
+    )
+
+    # Patches bug in SharePointReader init approach
+    sharepoint_reader._drive_id = drive_id
+    sharepoint_reader.drive_id = drive_id
+    sharepoint_reader._drive_id_endpoint = f"https://graph.microsoft.com/v1.0/sites/{full_sharepoint_site_id}/drives"
+
+    try:
+        # Load documents from SharePoint
+        documents = sharepoint_reader.load_data(
+            sharepoint_site_name=sharepoint_site_name,
+            sharepoint_folder_id=folder_id,
+            sharepoint_folder_path=folder_name,
+            recursive=True)
+        response = documents
+
+        # Immediately convert to a simple string and return
+        return response
+
+    except Exception as e:
+        logger.error(f"Could not load documents from SharePointReader: {str(e)}")
+        return f"Error loading documents: {str(e)}"
+
 
 
 ##########################
 
-def run():
-    mcp.run()
