@@ -20,15 +20,11 @@ class MailService:
         self.user_client = user_client
 
 
-    async def get_inbox(self, count: int = 50):
-        # Your existing code, unchanged
-        pass
-
     async def get_inbox(self, count: int=50):
         query_params = MessagesRequestBuilder.MessagesRequestBuilderGetQueryParameters(
             # Only request specific properties
             select=['from', 'isRead', 'receivedDateTime', 'subject', 'id', 'toRecipients', 'ccRecipients', 'bccRecipients', 'replyTo'],
-            # Get at most 25 results
+
             top=count,
             # Sort by received time, newest first
             orderby=['receivedDateTime DESC']

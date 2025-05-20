@@ -9,5 +9,17 @@ dependencies = [
     "msgraph-core",
     "msgraph-sdk",
     "pytest",
-    "pytest-asyncio"
+    "pytest-asyncio",
+    "numpy>2.0",
+    "pandas>2.1.0",
+    "megaparse",
+    "langchain_openai",
+    "pdf2image",
+    "llama_index",
+    "llama-index-readers-microsoft-sharepoint",
+    "torch",
+    "transformers",
+    "python-pptx",
+    "Pillow"
+
 ]

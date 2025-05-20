@@ -20,6 +20,7 @@ class AzureSettings:
         # Load configuration from environment variables
         self.client_id = os.getenv("AZURE_CLIENT_ID")
         self.tenant_id = os.getenv("AZURE_TENANT_ID")
+        self.client_secret = os.getenv("AZURE_CLIENT_SECRET")
         self.scopes = self._get_scopes()
 
         # Create .env file with these values if it doesn't exist

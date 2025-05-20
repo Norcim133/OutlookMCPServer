@@ -7,8 +7,8 @@ This project is an MCP server that gives Claude Desktop access to your Microsoft
 ## ✨ Features
 
 - ✅ **Mail access**: Compose, Respond, Sort, Search, Filter, and Analyze your inbox from Claude or any MCP-compatible agent
-- 🔜 **Calendar support**: List by date, Compose, Delete mails (coming soon: UpdateMail, Search)
-- 🚧 **OneDrive support**: Possible future direction after mail and calendar are robust
+- 🔜 **Calendar support**: Find invites, List Events, Compose/Update/Send Events
+- 🚧 **Sharepoint support**: Load drives, interact with files, search files
 
 ---
 
@@ -65,6 +65,7 @@ echo "AZURE_CLIENT_ID=<your-id-from-Azure-portal-here>" > .env
 echo "AZURE_TENANT_ID=<your-id-from-Azure-portal-here>" >> .env
 echo "AZURE_GRAPH_SCOPES=User.Read Mail.Read Mail.Send Mail.ReadWrite" >> .env
 ```
+NOTE: Additional .env values required for file services
 NOTE: On first run, the application will authenticate using the DeviceCodeCredential flow and will create auth_record.json in the auth_cache folder automatically if successful.
 
 ### You must have admin access to an Azure tenant to register an application with these permissions.
@@ -112,6 +113,7 @@ NOTE: You may need to replace "uv" with an absolute reference in "command"
 │       ├── __init__.py
 │       ├── calendar_service.py
 │       ├── controller.py
+│       ├── file_service.py
 │       ├── mail_service.py
 │   ├── __init__.py
 │   ├── auth_wrapper.py
@@ -130,9 +132,9 @@ NOTE: You may need to replace "uv" with an absolute reference in "command"
 ## 📌 Roadmap
 - Mail integration (DONE)
 - Auth in Claude Desktop (DONE)
-- Calendar integration (CORE DONE)
-- Optional OneDrive integration
-- Windows support
+- Calendar integration (DONE)
+- Sharepoint integration (DONE)
+- File parsing for LLM (IN PROGRESS)
 ---
 
 ## 📄 License
