@@ -220,7 +220,7 @@ class FilesService:
             return f"Error retrieving root drive item ID: {str(e)}"
 
 
-    async def get_files(self, drive_id: str, drive_item_id: str):
+    async def get_folders_and_files_from_drive_item(self, drive_id: str, drive_item_id: str):
         try:
             result = await self.user_client.drives.by_drive_id(drive_id).items.by_drive_item_id(
                 drive_item_id).children.get()
