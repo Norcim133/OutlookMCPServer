@@ -1083,7 +1083,7 @@ async def list_followed_sites(ctx: Context):
 
 @mcp.tool()
 @requires_graph_auth
-async def get_site_drives(ctx: Context, site_id: str = os.environ.get("FULL_SHAREPOINT_SITE_ID")):
+async def get_sharepoint_site_drives(ctx: Context, site_id: str = os.environ.get("FULL_SHAREPOINT_SITE_ID")):
     """
     Retrieves the list of drives (document libraries) for a given SharePoint site ID.
 
@@ -1166,6 +1166,15 @@ async def list_drive_folder_items(ctx: Context, drive_id: str, folder_item_id: s
 @mcp.tool()
 @requires_graph_auth
 async def get_organization_id(ctx: Context):
+    """
+    Get the organization ID.
+
+    Args:
+        ctx: FastMCP Context
+
+    Returns:
+        A string with the organization ID.
+    """
     files = ctx.request_context.lifespan_context.graph.files
     try:
         org_id = await files.get_organization_id()
@@ -1175,7 +1184,17 @@ async def get_organization_id(ctx: Context):
 
 @mcp.tool()
 @requires_graph_auth
-async def get_site_id_from_user(ctx: Context, site_index: int = 0):
+async def get_sharepoint_site_id_from_user(ctx: Context, site_index: int = 0):
+    """
+    Get the SharePoint site ID for the user's default site.
+
+    Args:
+        ctx: FastMCP Context
+        site_index: The index of the site to retrieve (default: 0).
+
+    Returns:
+        String with the site ID.
+    """
     files = ctx.request_context.lifespan_context.graph.files
     try:
         site_id = await files.get_site_id_from_user(site_index)
@@ -1188,6 +1207,15 @@ async def get_site_id_from_user(ctx: Context, site_index: int = 0):
 @mcp.tool()
 @requires_graph_auth
 async def get_user_drives(ctx: Context):
+    """
+    Get the list of drives (document libraries) for the user's default site.
+
+    Args:
+        ctx: FastMCP Context
+
+    Returns:
+        List of drives (document libraries).
+    """
     files = ctx.request_context.lifespan_context.graph.files
     try:
         drives = await files.get_user_drives()
@@ -1197,7 +1225,16 @@ async def get_user_drives(ctx: Context):
 
 @mcp.tool()
 @requires_graph_auth
-async def get_user_drive(ctx: Context):
+async def get_user_main_drive(ctx: Context):
+    """
+    Get the main drive (document library) for the user's default site.
+
+    Args:
+        ctx: FastMCP Context
+
+    Returns:
+        String object with drive metadata.
+    """
     files = ctx.request_context.lifespan_context.graph.files
     try:
         user_drive = await files.get_user_drive()
@@ -1208,6 +1245,15 @@ async def get_user_drive(ctx: Context):
 @mcp.tool()
 @requires_graph_auth
 async def get_user_drive_id(ctx: Context):
+    """
+    Get the ID of the user's default drive (document library).
+
+    Args:
+        ctx: FastMCP Context
+
+    Returns:
+        String with the drive ID.
+    """
     files = ctx.request_context.lifespan_context.graph.files
     try:
         drive_id = await files.get_user_drive_id()
@@ -1217,7 +1263,16 @@ async def get_user_drive_id(ctx: Context):
 
 @mcp.tool()
 @requires_graph_auth
-async def get_root_drive_item(ctx: Context):
+async def get_root_drive_item_for_user(ctx: Context):
+    """
+    Get the root drive item (e.g. folder) for the user.
+
+    Args:
+        ctx: FastMCP Context
+
+    Returns:
+        Object string for the root drive item.
+    """
     files = ctx.request_context.lifespan_context.graph.files
     try:
         drive_item = await files.get_root_drive_item()
@@ -1228,6 +1283,15 @@ async def get_root_drive_item(ctx: Context):
 @mcp.tool()
 @requires_graph_auth
 async def get_root_drive_item_id_for_user(ctx: Context):
+    """
+    Get the ID of the root drive item (e.g. folder) for the user.
+
+    Args:
+        ctx: FastMCP Context
+
+    Returns:
+        String with the ID of the root drive item.
+    """
     files = ctx.request_context.lifespan_context.graph.files
     try:
         root_drive_item_id = await files.get_root_drive_item_id_for_user()
@@ -1238,6 +1302,17 @@ async def get_root_drive_item_id_for_user(ctx: Context):
 @mcp.tool()
 @requires_graph_auth
 async def get_files(ctx: Context, drive_id: str, drive_item_id: str):
+    """
+    Get the files in a specific folder in a drive.
+
+    Args:
+        ctx: FastMCP Context
+        drive_id: The ID of the drive.
+        drive_item_id: The ID of the folder (which is a DriveItem ID).
+
+    Returns:
+        Response object string with the files in the folder.
+    """
     files = ctx.request_context.lifespan_context.graph.files
     try:
         files_info = await files.get_files(drive_id, drive_item_id)
@@ -1247,9 +1322,9 @@ async def get_files(ctx: Context, drive_id: str, drive_item_id: str):
 
 @mcp.tool()
 @requires_graph_auth
-async def search_my_drive(ctx: Context, query: str, drive_id: str):
+async def search_drive(ctx: Context, query: str, drive_id: str):
     """
-    Search for files and folders in the user's OneDrive
+    Search for files and folders in the user's OneDrive or SharePoint site drive
 
     Args:
         ctx: FastMCP Context
@@ -1257,7 +1332,7 @@ async def search_my_drive(ctx: Context, query: str, drive_id: str):
         drive_id: Drive ID
 
     Returns:
-        Search results from OneDrive
+        Search results from OneDrive or Sharepoint files
     """
     files = ctx.request_context.lifespan_context.graph.files
     try:
@@ -1271,7 +1346,7 @@ async def search_my_drive(ctx: Context, query: str, drive_id: str):
 async def get_drive_root_folder_id(ctx: Context, drive_id: str):
     """
     Gets the ID of the root folder (DriveItem) for a given drive.
-    This ID can be used as a folder_id to read from the root of a drive.
+    This ID can be used as a folder_id to read from when fetching files.
 
     Args:
         ctx: FastMCP Context
