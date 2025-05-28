@@ -24,6 +24,10 @@ You can:
 - Get calendar events and meetings
 - Create events and invites
 
+You can also answer queries about file contents. Microsoft related file search is just for file handling. llama related 
+file interactions allow you to see context for files or answer queries from their content via retrieval.
+Important: File ids will not match across graph an llama (or even llama files vs. llama pipeline files)
+
 By default for mail, use html formatting. Do not hallucinate data. Use MCP tools to fetch actual messages or folders.
 When unsure which folder an email belongs to, inspect the email body and/or compare the content with other mails already in the folder.
 
@@ -1068,7 +1072,7 @@ async def get_current_datetime(ctx: Context) -> str:
 
 @mcp.tool()
 @requires_graph_auth
-async def list_followed_sites(ctx: Context):
+async def list_followed_sharepoint_sites(ctx: Context):
     """
     Retrieves a list of SharePoint sites that the current user is following,
     returning their display names, IDs, and web URLs.
@@ -1111,7 +1115,7 @@ async def get_sharepoint_site_drives(ctx: Context, site_id: str = os.environ.get
 
 @mcp.tool()
 @requires_graph_auth
-async def list_drive_root_items(ctx: Context, drive_id: str):
+async def list_sharepoint_drive_root_items(ctx: Context, drive_id: str):
     """
     Lists files and folders in the root of a specific drive (document library).
 
@@ -1138,7 +1142,7 @@ async def list_drive_root_items(ctx: Context, drive_id: str):
 
 @mcp.tool()
 @requires_graph_auth
-async def list_drive_folder_items(ctx: Context, drive_id: str, folder_item_id: str):
+async def list_sharepoint_drive_folder_items(ctx: Context, drive_id: str, folder_item_id: str):
     """
     Lists files and folders within a specific folder in a drive.
 
@@ -1165,7 +1169,7 @@ async def list_drive_folder_items(ctx: Context, drive_id: str, folder_item_id: s
 
 @mcp.tool()
 @requires_graph_auth
-async def get_organization_id(ctx: Context):
+async def get_sharepoint_organization_id(ctx: Context):
     """
     Get the organization ID.
 
@@ -1206,7 +1210,7 @@ async def get_sharepoint_site_id_from_user(ctx: Context, site_index: int = 0):
 
 @mcp.tool()
 @requires_graph_auth
-async def get_user_drives(ctx: Context):
+async def get_user_sharepoint_or_onedrive_drives(ctx: Context):
     """
     Get the list of drives (document libraries) for the user's default site.
 
@@ -1225,7 +1229,7 @@ async def get_user_drives(ctx: Context):
 
 @mcp.tool()
 @requires_graph_auth
-async def get_user_main_drive(ctx: Context):
+async def get_user_main_microsoft_drive(ctx: Context):
     """
     Get the main drive (document library) for the user's default site.
 
@@ -1244,7 +1248,7 @@ async def get_user_main_drive(ctx: Context):
 
 @mcp.tool()
 @requires_graph_auth
-async def get_user_drive_id(ctx: Context):
+async def get_user_microsoft_drive_id(ctx: Context):
     """
     Get the ID of the user's default drive (document library).
 
@@ -1263,7 +1267,7 @@ async def get_user_drive_id(ctx: Context):
 
 @mcp.tool()
 @requires_graph_auth
-async def get_root_drive_item_for_user(ctx: Context):
+async def get_msft_root_drive_item_for_user(ctx: Context):
     """
     Get the root drive item (e.g. folder) for the user.
 
@@ -1282,7 +1286,7 @@ async def get_root_drive_item_for_user(ctx: Context):
 
 @mcp.tool()
 @requires_graph_auth
-async def get_root_drive_item_id_for_user(ctx: Context):
+async def get_msft_root_drive_item_id_for_user(ctx: Context):
     """
     Get the ID of the root drive item (e.g. folder) for the user.
 
@@ -1301,7 +1305,7 @@ async def get_root_drive_item_id_for_user(ctx: Context):
 
 @mcp.tool()
 @requires_graph_auth
-async def get_files(ctx: Context, drive_id: str, drive_item_id: str):
+async def get_microsoft_files(ctx: Context, drive_id: str, drive_item_id: str):
     """
     Get the files in a specific folder in a drive.
 
@@ -1315,14 +1319,14 @@ async def get_files(ctx: Context, drive_id: str, drive_item_id: str):
     """
     files = ctx.request_context.lifespan_context.graph.files
     try:
-        files_info = await files.get_files(drive_id, drive_item_id)
+        files_info = await files.get_folders_and_files_from_drive_item(drive_id, drive_item_id)
         return files_info
     except Exception as e:
         return f"Error retrieving files for drive ID '{drive_id}' and drive item ID '{drive_item_id}': {str(e)}"
 
 @mcp.tool()
 @requires_graph_auth
-async def search_drive(ctx: Context, query: str, drive_id: str):
+async def search_microsoft_drive(ctx: Context, query: str, drive_id: str):
     """
     Search for files and folders in the user's OneDrive or SharePoint site drive
 
@@ -1343,7 +1347,7 @@ async def search_drive(ctx: Context, query: str, drive_id: str):
 
 @mcp.tool()
 @requires_graph_auth
-async def get_drive_root_folder_id(ctx: Context, drive_id: str):
+async def get_msft_drive_root_folder_id(ctx: Context, drive_id: str):
     """
     Gets the ID of the root folder (DriveItem) for a given drive.
     This ID can be used as a folder_id to read from when fetching files.
@@ -1364,58 +1368,103 @@ async def get_drive_root_folder_id(ctx: Context, drive_id: str):
     except Exception as e:
         return f"Error getting the root folder ID for the drive ID '{drive_id}': {str(e)}"
 
+
 @mcp.tool()
 @requires_graph_auth
-async def read_sharepoint_files(
-        ctx: Context,
-        full_sharepoint_site_id: str = os.getenv("FULL_SHAREPOINT_SITE_ID"),
-        sharepoint_site_name: str = os.getenv("SHAREPOINT_SITE_NAME"),
-        drive_id: str = os.getenv("TOP_LEVEL_DRIVE_ID"),
-        drive_name: str = os.getenv("TOP_LEVEL_DRIVE_NAME"),
-        folder_id: str = os.getenv("TARGET_FOLDER_ID"),
-        folder_name: str = os.getenv("TARGET_FOLDER_NAME")
-    ):
-    from llama_index.readers.microsoft_sharepoint import SharePointReader
+async def list_llama_projects(ctx: Context) -> str:
+    """List existing LlamaCloud indices/pipelines"""
+    pipeline_controller = ctx.request_context.lifespan_context.llama
+    projects_list = await pipeline_controller.list_llama_projects()
+    return projects_list
 
-    auth_settings = ctx.request_context.lifespan_context.settings
-    client_id = auth_settings.client_id
-    client_secret = auth_settings.client_secret
-    tenant_id = auth_settings.tenant_id
+@mcp.tool()
+@requires_graph_auth
+async def list_llama_indices(ctx: Context, llama_project_id: Optional[str] = os.getenv('LLAMA_PROJECT_ID')) -> str:
+    """List existing LlamaCloud indices/pipelines"""
+    pipeline_controller = ctx.request_context.lifespan_context.llama
+    pipeline_list = await pipeline_controller.list_llama_indices(llama_project_id = llama_project_id)
+    return pipeline_list
 
-    logger = logging.getLogger(__name__)
 
-    sharepoint_reader = SharePointReader(
-        client_id=client_id,
-        client_secret=client_secret,
-        tenant_id=tenant_id,
-        sharepoint_site_id=full_sharepoint_site_id,
-        sharepoint_site_name=sharepoint_site_name,
-        drive_name=drive_name,
-        sharepoint_folder_path=folder_name #It just needs the path relative to the drive (in this case, the folder name)
+@mcp.tool()
+@requires_graph_auth
+async def init_milvus_db(ctx: Context) -> str:
+    """Initialize Milvus database with test data"""
+    from pymilvus import MilvusClient
+    from pymilvus import model
+    import logging
+
+    client = MilvusClient("milvus_demo.db")
+    if client.has_collection("demo_collection"):
+        client.drop_collection("demo_collection")
+
+    client.create_collection(
+        collection_name="demo_collection",
+        dimension=768,  # Default embedding dimension
+        metric_type="IP"  # Inner product
+    )
+    docs = [
+        "Why: 95% of the delivery time arises between delivery steps, but the improvement effort focuses on the other 5%",
+        "# Source of lead time (1/3)",
+        "A small capacity shortfall will, each week, cause an ever-increasing queue; driving lead time higher",
+        "# Client Onboarding: 38x ROI identified in 2 hours",
+        "The rate of completions has been lagging the incoming rate of new clients by as much as 25%.",
+        "Every additional day of 'latency' costs $1.7 million in lost revenue.",
+        "The team needs ~53 more completions per month to avoid a queue.",
+        "At 7 items per FTE, resolving the capacity mismatch would take just 8 FTE.",
+        "Total value of a 40-day improvement: $68 million"
+    ]
+
+    embedding_fn = model.DefaultEmbeddingFunction()
+    vectors = embedding_fn.encode_documents(docs)
+
+    data = [
+        {"id": i, "vector": vectors[i], "text": docs[i], "subject": "business"}
+        for i in range(len(vectors))
+    ]
+
+    res = client.insert(collection_name="demo_collection", data=data)
+    logging.info(f"MILVUS: Inserted {len(data)} documents")
+
+    # Test search
+    query_vectors = embedding_fn.encode_queries(["What is the cause of wait time?"])
+    search_res = client.search(
+        collection_name="demo_collection",
+        data=query_vectors,
+        limit=2,
+        output_fields=["text", "subject"],
     )
 
-    # Patches bug in SharePointReader init approach
-    sharepoint_reader._drive_id = drive_id
-    sharepoint_reader.drive_id = drive_id
-    sharepoint_reader._drive_id_endpoint = f"https://graph.microsoft.com/v1.0/sites/{full_sharepoint_site_id}/drives"
+    return f"Milvus initialized with {len(docs)} documents. Search test results: {search_res}"
 
-    try:
-        # Load documents from SharePoint
-        documents = sharepoint_reader.load_data(
-            sharepoint_site_name=sharepoint_site_name,
-            sharepoint_folder_id=folder_id,
-            sharepoint_folder_path=folder_name,
-            recursive=True)
-        response = documents
+@mcp.tool()
+@requires_graph_auth
+async def parse_file_with_llamaparse(ctx: Context, file_id:str = os.getenv('TEST_FILE_ID'), drive_id: str = os.getenv('TOP_LEVEL_DRIVE_ID')) -> str:
+    """Parse a SharePoint file using LlamaParse"""
+    from llama_parse import LlamaParse
+    import tempfile
 
-        # Immediately convert to a simple string and return
-        return response
+    # Get the file from SharePoint
+    graph = ctx.request_context.lifespan_context.graph
+    file_content = await graph.user_client.drives.by_drive_id(drive_id).items.by_drive_item_id(file_id).content.get()
 
-    except Exception as e:
-        logger.error(f"Could not load documents from SharePointReader: {str(e)}")
-        return f"Error loading documents: {str(e)}"
+    # Save to temp file
+    with tempfile.NamedTemporaryFile(suffix='.pptx', delete=False) as temp_file:
+        temp_file.write(file_content)
+        temp_path = temp_file.name
 
+    # Parse with LlamaParse
+    parser = LlamaParse(api_key=os.getenv("LLAMA_CLOUD_API_KEY"), auto_mode=True)
+    result = await parser.aparse(temp_path)
 
+    # Clean up
+    os.unlink(temp_path)
+
+    # Get markdown documents from the result
+    markdown_documents = result.get_markdown_documents()
+    docs = markdown_documents[0].text
+
+    return docs
 
 ##########################
 
