@@ -1615,8 +1615,6 @@ async def sync_llama_pipeline(ctx: Context, pipeline_id: str) -> str:
     return result
 
 
-# Add these tools to your server.py file
-
 @mcp.tool()
 @requires_graph_auth
 async def create_llama_retriever(
@@ -2007,3 +2005,4 @@ async def get_index_status(ctx: Context, pipeline_id) -> str:
         return response
     except Exception as e:
         return f"Error getting pipeline status: {str(e)}"
+
