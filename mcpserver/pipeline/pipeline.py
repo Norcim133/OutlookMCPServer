@@ -754,7 +754,7 @@ class SyncPipelineController:
                     folder_id=folder_id,
                 )
             }
-            data_source = self.sync_client.data_sources.create_data_source(request=ds)
+            data_source = self.client.data_sources.create_data_source(request=ds)
 
             return data_source
         except Exception as e:
@@ -777,8 +777,6 @@ class SyncPipelineController:
             return response
         except Exception as e:
             return f"Failed to get pipelines data sources: {e}"
-
-        return response
 
 
     def add_data_source_to_pipeline(self, pipeline_id: str, data_source_id: str = os.getenv('DATA_SOURCE_ID'), sync_interval: float = 43200.0):
@@ -1239,3 +1237,21 @@ class SyncPipelineController:
 
         except Exception as e:
             return f"Error adding files to pipeline: {str(e)}"
+
+    def rename_pipeline(self, new_name:str, pipeline_id:str):
+        logging.error(f"Renaming pipeline '{new_name}'")
+        if new_name is None or pipeline_id is None:
+            logging.warning("No name passed to rename_pipeline")
+            raise MissingValueError("No name was submitted to rename_pipeline")
+
+        try:
+            response = self.client.pipelines.update_existing_pipeline(
+                pipeline_id=pipeline_id,
+                name=new_name
+            )
+
+            if response.name != new_name:
+                raise APIError(f"Error with rename_pipeline. Full response: {response}")
+            return response.name
+        except Exception as e:
+            raise APIError(f"Error with call to update pipeline name: {str(e)}")
