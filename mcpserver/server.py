@@ -10,6 +10,8 @@ from typing import Any, Optional, List
 import json
 import logging
 import os
+from llama_parse import LlamaParse
+import tempfile
 
 APP_INSTRUCTIONS = """
 You are a hyper intelligent tech user who has full access to the user's Microsoft365 email account via the OutlookMCP server.
@@ -1413,10 +1415,25 @@ async def get_llama_index(ctx: Context, index_id: str):
 
 @mcp.tool()
 @requires_graph_auth
+async def save_temp_file_locally(ctx: Context, file_suffix:str, file_content:str):
+    # Save to temp file
+    if file_suffix[0] != ".":
+        file_suffix = "." + file_suffix
+    try:
+        with tempfile.NamedTemporaryFile(suffix=file_suffix, delete=False, ) as temp_file:
+            temp_file.write(file_content.encode())
+            temp_path = temp_file.name
+        return os.path.abspath(temp_path)
+
+    except Exception as e:
+        return f"Error saving file: {str(e)}"
+
+
+@mcp.tool()
+@requires_graph_auth
 async def quick_parse_sharepoint_file(ctx: Context, sharepoint_file_id:str = os.getenv('TEST_FILE_ID'), sharepoint_drive_id: str = os.getenv('TOP_LEVEL_DRIVE_ID')) -> str:
     """Parse a SharePoint file using LlamaParse"""
-    from llama_parse import LlamaParse
-    import tempfile
+
 
     # Get the file from SharePoint
     graph = ctx.request_context.lifespan_context.graph
@@ -2006,3 +2023,32 @@ async def get_index_status(ctx: Context, pipeline_id) -> str:
     except Exception as e:
         return f"Error getting pipeline status: {str(e)}"
 
+
+@mcp.tool()
+@requires_graph_auth
+async def upload_file_to_folder(ctx: Context, drive_id: str, folder_id: str, file_name: str, file_content: bytes):
+    """
+    Upload a file to a specific folder in SharePoint
+
+    Args:
+        ctx: FastMCP Context
+        drive_id: The drive ID
+        folder_id: The folder's item ID
+        file_name: Name for the file
+        file_content: File content as bytes
+    """
+    import httpx
+
+    settings = ctx.request_context.lifespan_context.settings
+    token = settings.credential.get_token("https://graph.microsoft.com/.default")
+
+    async with httpx.AsyncClient() as client:
+        response = await client.put(
+            f"https://graph.microsoft.com/v1.0/drives/{drive_id}/items/{folder_id}:/{file_name}:/content",
+            headers={
+                "Authorization": f"Bearer {token.token}",
+                "Content-Type": "text/plain"
+            },
+            content=file_content
+        )
+        return response.json()

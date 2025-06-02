@@ -833,22 +833,6 @@ class SyncPipelineController:
             return f"Failed to list available pipeline files: {e}"
 
 
-    def _search_index(self, pipeline_id: str=os.getenv('LLAMA_INDEX_ID'), query: str=""):
-        try:
-            result = self.client.pipelines.run_search(pipeline_id=pipeline_id, query=query)
-
-            response_text = f"Search results for '{query}':\n\n"
-
-            for i, node in enumerate(result.retrieval_nodes, 1):
-                response_text += f"Result {i} (Score: {node.score:.3f}):\n"
-                response_text += f"Source: {node.node.extra_info.get('file_name', 'Unknown')}\n"
-                response_text += f"Content: {node.node.text}\n\n"
-            print("\n", response_text)
-            return response_text
-        except Exception as e:
-            logging.error(e)
-            return f"Failed to search index: {e}"
-
     def search_index(self, pipeline_id: str = os.getenv('LLAMA_INDEX_ID'), query: str = ""):
         try:
             result = self.client.pipelines.run_search(pipeline_id=pipeline_id, query=query)

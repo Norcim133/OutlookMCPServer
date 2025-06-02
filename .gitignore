@@ -14,9 +14,10 @@ __pycache__/
 # OS-specific cruft
 .DS_Store
 
-# Local auth and config (MCP secrets)
+# Local auth and config
 auth_record.json
 auth_cache/
+.streamlit/
 
 
 # Test caches
@@ -24,3 +25,4 @@ tests/__pycache__/
 tests/
 pytest.ini
 *.log
+
