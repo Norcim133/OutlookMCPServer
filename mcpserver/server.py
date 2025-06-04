@@ -8,7 +8,6 @@ from mcpserver.context_manager import app_lifespan
 from mcpserver.mail_query import MailQuery
 from typing import Any, Optional, List
 import json
-import logging
 import os
 from llama_parse import LlamaParse
 import tempfile
@@ -1493,7 +1492,7 @@ async def get_llama_data_sources(ctx: Context) -> str:
         List of data sources with names and IDs
     """
     pipeline_controller = ctx.request_context.lifespan_context.llama
-    result = await pipeline_controller.get_data_sources()
+    result = await pipeline_controller.get_data_sources_id_map()
     return result
 
 
@@ -2026,7 +2025,7 @@ async def get_index_status(ctx: Context, pipeline_id) -> str:
 
 @mcp.tool()
 @requires_graph_auth
-async def upload_file_to_folder(ctx: Context, drive_id: str, folder_id: str, file_name: str, file_content: bytes):
+async def upload_file_to_sharepoint_folder(ctx: Context, drive_id: str, folder_id: str, file_name: str, file_content: bytes):
     """
     Upload a file to a specific folder in SharePoint
 
@@ -2052,3 +2051,31 @@ async def upload_file_to_folder(ctx: Context, drive_id: str, folder_id: str, fil
             content=file_content
         )
         return response.json()
+
+
+@mcp.tool()
+@requires_graph_auth
+async def rename_sharepoint_file(ctx: Context, drive_id: str, file_id: str, new_name: str) -> str:
+    """
+    Rename a file in SharePoint
+
+    Args:
+        ctx: FastMCP Context
+        drive_id: The drive ID
+        file_id: The file's item ID
+        new_name: New name for the file (include extension)
+
+    Returns:
+        Success message with new file details
+    """
+    from msgraph.generated.models.drive_item import DriveItem
+
+    graph = ctx.request_context.lifespan_context.graph
+
+    request_body = DriveItem(
+        name=new_name,
+    )
+
+    result = await graph.user_client.drives.by_drive_id(drive_id).items.by_drive_item_id(file_id).patch(request_body)
+
+    return f"File renamed successfully to: {result.name}"

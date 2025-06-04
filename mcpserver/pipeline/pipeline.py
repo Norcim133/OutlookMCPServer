@@ -1,4 +1,6 @@
 from llama_cloud.client import LlamaCloud, AsyncLlamaCloud
+from llama_index.indices.managed.llama_cloud import LlamaCloudIndex
+from llama_index.core.schema import ImageNode, TextNode, NodeWithScore
 import os
 from typing import Optional, List, Dict
 import json
@@ -68,8 +70,9 @@ class PipelineController:
         except Exception as e:
             return f"Error getting pipeline {e}"
 
-    async def get_data_sources(self):
+    async def get_data_sources_id_map(self):
         response = await self.client.data_sources.list_data_sources(organization_id=self.organization_id)
+
         if len(response) == 0:
             return "No data sources found"
 
@@ -79,6 +82,7 @@ class PipelineController:
         source_dict = {}
         for source in response:
             source_dict[source.name] = source.id
+            source_dict[source.id] = source.name
             result += json.dumps(source_dict, indent=4)
         return result
 
@@ -597,14 +601,15 @@ class PipelineController:
 
 
 
-class SyncPipelineController:
+class RAGService:
     def __init__(self):
         try:
             from pathlib import Path
             from dotenv import load_dotenv
             env_path = Path('.') / '.env'
             load_dotenv(dotenv_path=env_path)
-            self.client = LlamaCloud(token=os.getenv("LLAMA_CLOUD_API_KEY"))
+            self.api_key = os.getenv("LLAMA_CLOUD_API_KEY")
+            self.client = LlamaCloud(token=self.api_key)
         except Exception as e:
             logging.error(f"Failed to initialize LlamaCloud client: {str(e)}")
             raise e
@@ -713,7 +718,7 @@ class SyncPipelineController:
         except Exception as e:
             return f"Error getting pipeline {e}"
 
-    def get_data_sources(self):
+    def get_data_sources_id_map(self, raw_mode=False):
         response = self.client.data_sources.list_data_sources(organization_id=self.organization_id)
         if len(response) == 0:
             return "No data sources found"
@@ -724,6 +729,9 @@ class SyncPipelineController:
         source_dict = {}
         for source in response:
             source_dict[source.name] = source.id
+            source_dict[source.id] = source.name
+            if raw_mode:
+                return source_dict
             result += json.dumps(source_dict, indent=4)
         return result
 
@@ -792,30 +800,34 @@ class SyncPipelineController:
         except Exception as e:
             return f"Failed to add data sources to pipeline: {e}"
 
-    def _format_file_response(self, files, raw_response):
+    def _format_file_response(self, files):
         result = ""
         files_dict = {}
         if files:
-            result += "Files accessible to LlamaCloud:\n"
+            result += "Files accessible to LlamaCloud:\n\n"
             for file in files:
-                if raw_response:
-                    result += str(file) + "\n"
                 files_dict[file.id] = {}
                 files_dict[file.id]['path'] = file.name
                 files_dict[file.id]['content_url'] = file.resource_info.get('url', None)
-            if not raw_response:
                 result += json.dumps(files_dict, indent=4)
+                result += "\n\n"
+            return result
         else:
             logging.warning("LIST_LLAMA_INDICES: No files found")
             result += "No pipelines found.\n"
-        return result
 
 
-    def list_available_llama_files(self, organization_id: str=os.getenv('LLAMA_ORG_ID'), raw_response=False):
+    def list_available_llama_files(self, raw_response=False):
+
+        organization_id = self.organization_id
 
         try:
             files = self.client.files.list_files(organization_id=organization_id)
-            result = self._format_file_response(files, raw_response)
+            if raw_response:
+
+                return files
+
+            result = self._format_file_response(files)
 
             return result
         except Exception as e:
@@ -825,7 +837,9 @@ class SyncPipelineController:
     def list_pipeline_files(self, pipeline_id: str=os.getenv("LLAMA_INDEX_ID"), raw_response=False):
         try:
             files = self.client.pipelines.list_pipeline_files(pipeline_id=pipeline_id)
-            result = self._format_file_response(files, raw_response)
+            if raw_response:
+                return files
+            result = self._format_file_response(files)
 
             return result
         except Exception as e:
@@ -1067,8 +1081,6 @@ class SyncPipelineController:
             os.unlink(temp_file_path)
             os.rmdir(temp_dir)
 
-    # Methods for pipeline.py
-
     def list_file_screenshots(self, file_id: str):
         """List all page screenshots available for a file"""
         from mcp.server.fastmcp import FastMCP, Image
@@ -1098,7 +1110,7 @@ class SyncPipelineController:
 
             url = f"https://api.cloud.llamaindex.ai/api/v1/files/{file_id}/page_screenshots/{page_index}"
 
-            with httpx.AsyncClient() as client:
+            with httpx.Client() as client:
                 response = client.get(
                     url,
                     headers={
@@ -1239,3 +1251,95 @@ class SyncPipelineController:
             return response.name
         except Exception as e:
             raise APIError(f"Error with call to update pipeline name: {str(e)}")
+
+
+    def _parse_files_to_hierarchy(self, files):
+        """
+        Parse LlamaCloud files into a hierarchical structure
+        """
+        hierarchy = {
+            "data_sources": {},
+            "individual_files": []
+        }
+
+        for file in files:
+            file_info = {
+                "id": file.id,
+                "name": file.name.split('/')[-1],  # Just the filename
+                "url": file.resource_info.get('url', None) if file.resource_info else None,
+                "full_path": file.name
+            }
+
+            if file.data_source_id:
+                # This is from a data source
+                ds_id_map = self.get_data_sources_id_map(raw_mode=True)
+                ds_name = ds_id_map.get(file.data_source_id)
+
+
+                # Initialize data source if not exists
+                if ds_name not in hierarchy["data_sources"]:
+                    hierarchy["data_sources"][ds_name] = {
+                        "name": "All Company Documents",
+                        "folders": {}
+                    }
+
+                # Parse the path
+                path_parts = file.name.split('/')
+                if len(path_parts) > 2:  # Has folder structure
+                    folder_name = path_parts[1]  # Assuming "All Company/Folder/File"
+
+                    if folder_name not in hierarchy["data_sources"][ds_name]["folders"]:
+                        hierarchy["data_sources"][ds_name]["folders"][folder_name] = {
+                            "files": []
+                        }
+
+                    hierarchy["data_sources"][ds_name]["folders"][folder_name]["files"].append(file_info)
+
+            else:
+                # Individual file
+                hierarchy["individual_files"].append(file_info)
+
+        # Sort everything alphabetically
+        for ds_name in hierarchy["data_sources"]:
+            for folder in hierarchy["data_sources"][ds_name]["folders"]:
+                hierarchy["data_sources"][ds_name]["folders"][folder]["files"].sort(
+                    key=lambda x: x["name"].lower()
+                )
+
+        hierarchy["individual_files"].sort(key=lambda x: x["name"].lower())
+
+        return hierarchy
+
+    def list_llama_files_dict(self):
+        organization_id = self.organization_id
+
+        try:
+            files = self.client.files.list_files(organization_id=organization_id)
+
+            return self._parse_files_to_hierarchy(files)
+
+        except Exception as e:
+            logging.error(e)
+            return f"Failed to list available Llama files: {e}"
+
+    def multi_modal_retrieval(self, query_text: str, pipeline_name):
+        if query_text is None or pipeline_name is None:
+            raise MissingValueError("Query text or pipeline_id is missing")
+
+        multimodal_index = LlamaCloudIndex(
+            name=pipeline_name,
+            project_id=self.project_id,
+            organization_id=self.organization_id,
+            api_key=self.api_key
+        )
+        try:
+            retriever = multimodal_index.as_retriever(
+                similarity_top_k=5,
+                retrieve_image_nodes=True
+            )
+            nodes_with_scores: list[NodeWithScore] = retriever.retrieve(query_text)
+            return nodes_with_scores
+        except Exception as e:
+            logging.error(e)
+            raise e
+
