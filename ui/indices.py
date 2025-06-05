@@ -68,9 +68,9 @@ def rename_index_component():
             st.warning("No current index name selected.")
         else:
             st.write(f"Changing name for theme: {current_index_name}")
-            new_name_input = st.text_input("New name:",
-                                           key="rename_dialog_new_name_input",
-                                           placeholder="Enter new name")
+            st.text_input("New name:",
+                           key="rename_dialog_new_name_input",
+                           placeholder="Enter new name")
 
             if st.button("Save Rename",
                          key="rename_dialog_save_btn"

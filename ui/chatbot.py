@@ -7,6 +7,7 @@ from llama_index.indices.managed.llama_cloud import LlamaCloudIndex
 from llama_index.llms.openai import OpenAI
 from utils.llama_retrieval import *
 
+
 from .indices import *
 
 #TODO: Include history as context
@@ -50,12 +51,19 @@ def llama_chatbot(current_index_name):
 
 
 def chatbot():
-    st.title("Chat Bot")
+    #st.title("Chat Bot")
+    if 'chat_engine' not in st.session_state:
+        st.session_state.chat_engine = llama_chatbot(st.session_state.get('current_index_name', None))
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
+    if "chat_started" not in st.session_state:
+        st.session_state.chat_started = False
 
     try:
         with st.container(height=500):
-            if "messages" not in st.session_state:
-                st.session_state.messages = []
+
+            if not st.session_state.chat_started:
+                st.info("Ask a question to get started.")
 
             # Display chat messages from history on app rerun
             for message in st.session_state.messages:
@@ -69,18 +77,18 @@ def chatbot():
             # React to user input
         if prompt := st.chat_input("Ask a question", disabled=not st.session_state.get('current_index_name', None)):
             # Display user message in chat message container
+            st.session_state.chat_started = True
             with user_placeholder:
                 st.chat_message("user").markdown(prompt)
             # Add user message to chat history
             st.session_state.messages.append({"role": "user", "content": prompt})
 
-            chat_engine = llama_chatbot(st.session_state.get('current_index_name', None))
             st.session_state.query_nodes = st.session_state.llama.multi_modal_retrieval(query_text=prompt, pipeline_name=st.session_state.get('current_index_name', None))
 
             with ai_placeholder:
                 with st.chat_message("assistant"):
 
-                    response = st.write_stream(chat_engine.stream_chat(prompt).response_gen)
+                    response = st.write_stream(st.session_state.chat_engine.stream_chat(prompt).response_gen)
                     #response = "Hi there testing"
             st.session_state.messages.append({"role": "assistant", "content": response})
             st.rerun()
@@ -92,4 +100,8 @@ def chatbot():
 
     #TODO: Decide what and where to put ths
     if st.button("Reset chat state"):
-        st.session_state.chat_engine.reset()
+        if st.session_state.chat_engine:
+            st.session_state.chat_engine.reset()
+        st.session_state.chat_started = False
+        st.session_state.messages = []
+        st.rerun()
