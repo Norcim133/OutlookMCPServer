@@ -32,18 +32,22 @@ def set_index_state_with_selector():
 def indices_selector():
     #st.subheader("Theme Selector")
 
-    st.selectbox("Select a Theme",
+    st.selectbox("Select a Source",
                  options = st.session_state.llama.indices,
                  key = "indices_selector",
                  on_change=set_index_state_with_selector,
                  index = next((i for i, k in enumerate(st.session_state.llama.indices) if k == st.session_state.get('current_index_name')), None))
                  # Get index but reverts to first item in keys if item not there
 
-    st.subheader("Current Theme")
-    for theme in st.session_state.llama.indices.keys():
-        st.button(theme, use_container_width=True)
+
     #st.write(st.session_state.get('current_index_name', None))
 
+def frequent_queries():
+    st.subheader("Frequent Queries")
+    st.text("")
+    st.button("Show open risk items", use_container_width=True)
+    st.button("Identify potential risk gaps", use_container_width=True)
+    st.button("Share status of risk projects", use_container_width=True)
 
 def rename_index():
     current_index_name = st.session_state.get('current_index_name', None)
@@ -60,7 +64,7 @@ def rename_index():
 
 def rename_index_component():
 
-    @st.dialog("Rename Theme")
+    @st.dialog("Rename Source")
     def index_rename_dialog():
         st.session_state['show_rename_index_dialog'] = False
         current_index_name = st.session_state.get('current_index_name', None)
@@ -83,7 +87,7 @@ def rename_index_component():
                 time.sleep(2)
                 st.rerun()
 
-    st.button("Rename Theme",
+    st.button("Rename Source",
               on_click=index_rename_dialog,
               disabled=not st.session_state.get('indices_selector', False)
               )
@@ -92,16 +96,33 @@ def rename_index_component():
         index_rename_dialog()
 
 
+def indices_edit():
+    col1, col2 = st.columns(2)
+    with col1:
+        rename_index_component()
+
+    with col2:
+        st.button("Delete Source")
+
 def indices():
     try:
         if "current_index_name" not in st.session_state:
             st.session_state['current_index_name'] = None
 
-        #indices_list_view()
 
+        #indices_list_view()
+        st.subheader("Query Sources")
+        st.text("")
         indices_selector()
 
-        rename_index_component()
+        st.text("")
+        st.text("")
+
+        indices_edit()
+
+        st.divider()
+
+        frequent_queries()
 
     except Exception as e:
         st.error(e)

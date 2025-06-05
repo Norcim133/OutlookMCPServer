@@ -7,11 +7,11 @@ import json
 import streamlit as st
 
 
-def llama_retrieval(nodes_with_scores):
-    if nodes_with_scores is None:
-        raise ValueError("nodes_with_scores cannot be None")
+def llama_retrieval(_nodes_with_scores):
+    if _nodes_with_scores is None:
+        raise ValueError("_nodes_with_scores cannot be None")
     nodes = []
-    for node_with_score in nodes_with_scores:
+    for node_with_score in _nodes_with_scores:
         node = node_with_score.node
         score = node_with_score.score
         if isinstance(node, ImageNode):

@@ -12,11 +12,10 @@ from ui.header import header
 
 def st_side_bar():
     with st.sidebar:
-        st.title("Query Sources")
-
-        #dashboard()
 
         indices()
+
+        #dashboard()
 
 
 def app_body():
@@ -48,14 +47,30 @@ def init_RAGService():
         raise CriticalInitializationError(f"Failed to initialize rag_service: {str(e)}")
     st.session_state.refresh_state = False
 
+def set_log_level():
+    # TODO: To change logging, change here and in config.toml
+    logging.basicConfig(
+        level=logging.INFO,  # Set the minimum logging level to INFO
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',  # Optional: customize log format
+        datefmt='%Y-%m-%d %H:%M:%S'  # Optional: customize date format
+    )
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+
 def main():
     #Refresh state used for changes to llamacloud objects org, project, indices
     #Set to true for first run of app
-    if 'refresh_state' not in st.session_state:
-        st.session_state['refresh_state'] = True
 
     #Boilerplate config for all streamlit apps
-    st.set_page_config(page_title="Proof", page_icon=":apple:", layout="wide", menu_items=None)
+    st.set_page_config(page_title="Proof",
+                       page_icon=":apple:",
+                       layout="wide",
+                       menu_items=None,
+                       )
+
+    set_log_level()
+
+    if 'refresh_state' not in st.session_state:
+        st.session_state['refresh_state'] = True
 
     header()
     #HTML for control over streamlit components

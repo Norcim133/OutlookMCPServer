@@ -14,6 +14,8 @@ from .indices import *
 #TODO: Save history
 #TODO: Limit history
 
+logger = logging.getLogger(__name__)
+
 @st.cache_resource
 def llama_chatbot(current_index_name):
 
@@ -49,13 +51,21 @@ def llama_chatbot(current_index_name):
 
     return chat_engine
 
-
+@st.fragment
 def chatbot():
-    #st.title("Chat Bot")
+    if st.session_state.get('current_index_name', None) is None:
+        st.warning("Select an index to get started")
+        return
+
     if 'chat_engine' not in st.session_state:
-        st.session_state.chat_engine = llama_chatbot(st.session_state.get('current_index_name', None))
+        try:
+            st.session_state.chat_engine = llama_chatbot(st.session_state.get('current_index_name', None))
+        except Exception as e:
+            logging.exception(f"CHATBOT: {e}")
+            raise e
     if "messages" not in st.session_state:
         st.session_state.messages = []
+
     if "chat_started" not in st.session_state:
         st.session_state.chat_started = False
 
@@ -63,12 +73,15 @@ def chatbot():
         with st.container(height=500):
 
             if not st.session_state.chat_started:
-                st.info("Ask a question to get started.")
+                st.info("Ask a question about your files")
+                logger.info("Chat not started")
 
-            # Display chat messages from history on app rerun
-            for message in st.session_state.messages:
-                with st.chat_message(message["role"]):
-                    st.markdown(message["content"])
+            else:
+                logger.info("Chat has started")
+                # Display chat messages from history on app rerun
+                for message in st.session_state.messages:
+                    with st.chat_message(message["role"]):
+                        st.markdown(message["content"])
 
             user_placeholder = st.empty()
 
@@ -96,12 +109,6 @@ def chatbot():
     except Exception as e:
         st.error(e)
         logging.exception(e)
-        st.warning(f"An error occurred with chat input: {e}")
+        st.warning(f"An error occurred with chat input. Please try again later.")
 
-    #TODO: Decide what and where to put ths
-    if st.button("Reset chat state"):
-        if st.session_state.chat_engine:
-            st.session_state.chat_engine.reset()
-        st.session_state.chat_started = False
-        st.session_state.messages = []
-        st.rerun()
+
