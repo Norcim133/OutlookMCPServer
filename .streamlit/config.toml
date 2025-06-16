@@ -1,5 +1,0 @@
-[logger]
-level = "info"
-
-[client]
-toolbarMode = "minimal"
