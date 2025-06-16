@@ -1,4 +1,4 @@
-from mcp.server.fastmcp import FastMCP, Context
+from mcp.server.fastmcp import FastMCP, Context, Image
 from mcp.server.fastmcp.prompts import base
 
 
@@ -8,8 +8,9 @@ from mcpserver.context_manager import app_lifespan
 from mcpserver.mail_query import MailQuery
 from typing import Any, Optional, List
 import json
-import logging
 import os
+from llama_parse import LlamaParse
+import tempfile
 
 APP_INSTRUCTIONS = """
 You are a hyper intelligent tech user who has full access to the user's Microsoft365 email account via the OutlookMCP server.
@@ -24,12 +25,36 @@ You can:
 - Get calendar events and meetings
 - Create events and invites
 
+You also have access to advanced document search and retrieval capabilities through LlamaCloud:
+
+File Management:
+- Search Microsoft OneDrive/SharePoint files
+- List and navigate SharePoint sites and document libraries
+- Important: File IDs differ between systems (SharePoint IDs ≠ LlamaCloud IDs ≠ Pipeline IDs)
+
+LlamaCloud RAG (Retrieval Augmented Generation):
+- Search indexed documents using `search_llama_index` for basic search
+- Use `direct_multi_pipeline_search` for advanced chunk retrieval with relevance scores
+- Retrieval modes:
+  - "routing": Auto-selects best pipeline (faster, good for focused search)
+  - "full": Searches all pipelines (comprehensive, good for broad search)
+- Returns raw text chunks with metadata - no LLM processing, just pure retrieval
+- These chunks can be used to answer questions based on document content
+
+When answering questions about document content:
+1. First use retrieval tools to find relevant chunks
+2. Then synthesize an answer based on the retrieved information
+3. Be clear about which documents the information comes from
+
+When taking ingestion or retrieval actions:
+1. Check status of pipeline
+
 By default for mail, use html formatting. Do not hallucinate data. Use MCP tools to fetch actual messages or folders.
 When unsure which folder an email belongs to, inspect the email body and/or compare the content with other mails already in the folder.
 
 Always be helpful, privacy-conscious, and structured in your reasoning.
 
-IMPORTANT: Always use html formatting for the body of emails and calendar events. Do not hallucinate date.
+IMPORTANT: Always use html formatting for the body of emails and calendar events. Do not hallucinate data.
 """
 
 # Create an MCP server
@@ -1068,7 +1093,7 @@ async def get_current_datetime(ctx: Context) -> str:
 
 @mcp.tool()
 @requires_graph_auth
-async def list_followed_sites(ctx: Context):
+async def list_followed_sharepoint_sites(ctx: Context):
     """
     Retrieves a list of SharePoint sites that the current user is following,
     returning their display names, IDs, and web URLs.
@@ -1111,7 +1136,7 @@ async def get_sharepoint_site_drives(ctx: Context, site_id: str = os.environ.get
 
 @mcp.tool()
 @requires_graph_auth
-async def list_drive_root_items(ctx: Context, drive_id: str):
+async def list_sharepoint_drive_root_items(ctx: Context, drive_id: str):
     """
     Lists files and folders in the root of a specific drive (document library).
 
@@ -1138,7 +1163,7 @@ async def list_drive_root_items(ctx: Context, drive_id: str):
 
 @mcp.tool()
 @requires_graph_auth
-async def list_drive_folder_items(ctx: Context, drive_id: str, folder_item_id: str):
+async def list_sharepoint_drive_folder_items(ctx: Context, drive_id: str, folder_item_id: str):
     """
     Lists files and folders within a specific folder in a drive.
 
@@ -1165,7 +1190,7 @@ async def list_drive_folder_items(ctx: Context, drive_id: str, folder_item_id: s
 
 @mcp.tool()
 @requires_graph_auth
-async def get_organization_id(ctx: Context):
+async def get_sharepoint_organization_id(ctx: Context):
     """
     Get the organization ID.
 
@@ -1206,7 +1231,7 @@ async def get_sharepoint_site_id_from_user(ctx: Context, site_index: int = 0):
 
 @mcp.tool()
 @requires_graph_auth
-async def get_user_drives(ctx: Context):
+async def get_user_sharepoint_or_onedrive_drives(ctx: Context):
     """
     Get the list of drives (document libraries) for the user's default site.
 
@@ -1225,7 +1250,7 @@ async def get_user_drives(ctx: Context):
 
 @mcp.tool()
 @requires_graph_auth
-async def get_user_main_drive(ctx: Context):
+async def get_user_main_microsoft_drive(ctx: Context):
     """
     Get the main drive (document library) for the user's default site.
 
@@ -1244,7 +1269,7 @@ async def get_user_main_drive(ctx: Context):
 
 @mcp.tool()
 @requires_graph_auth
-async def get_user_drive_id(ctx: Context):
+async def get_user_microsoft_drive_id(ctx: Context):
     """
     Get the ID of the user's default drive (document library).
 
@@ -1263,7 +1288,7 @@ async def get_user_drive_id(ctx: Context):
 
 @mcp.tool()
 @requires_graph_auth
-async def get_root_drive_item_for_user(ctx: Context):
+async def get_msft_root_drive_item_for_user(ctx: Context):
     """
     Get the root drive item (e.g. folder) for the user.
 
@@ -1282,7 +1307,7 @@ async def get_root_drive_item_for_user(ctx: Context):
 
 @mcp.tool()
 @requires_graph_auth
-async def get_root_drive_item_id_for_user(ctx: Context):
+async def get_msft_root_drive_item_id_for_user(ctx: Context):
     """
     Get the ID of the root drive item (e.g. folder) for the user.
 
@@ -1301,7 +1326,7 @@ async def get_root_drive_item_id_for_user(ctx: Context):
 
 @mcp.tool()
 @requires_graph_auth
-async def get_files(ctx: Context, drive_id: str, drive_item_id: str):
+async def get_microsoft_files(ctx: Context, drive_id: str, drive_item_id: str):
     """
     Get the files in a specific folder in a drive.
 
@@ -1315,14 +1340,14 @@ async def get_files(ctx: Context, drive_id: str, drive_item_id: str):
     """
     files = ctx.request_context.lifespan_context.graph.files
     try:
-        files_info = await files.get_files(drive_id, drive_item_id)
+        files_info = await files.get_folders_and_files_from_drive_item(drive_id, drive_item_id)
         return files_info
     except Exception as e:
         return f"Error retrieving files for drive ID '{drive_id}' and drive item ID '{drive_item_id}': {str(e)}"
 
 @mcp.tool()
 @requires_graph_auth
-async def search_drive(ctx: Context, query: str, drive_id: str):
+async def search_microsoft_drive(ctx: Context, query: str, drive_id: str):
     """
     Search for files and folders in the user's OneDrive or SharePoint site drive
 
@@ -1343,7 +1368,7 @@ async def search_drive(ctx: Context, query: str, drive_id: str):
 
 @mcp.tool()
 @requires_graph_auth
-async def get_drive_root_folder_id(ctx: Context, drive_id: str):
+async def get_msft_drive_root_folder_id(ctx: Context, drive_id: str):
     """
     Gets the ID of the root folder (DriveItem) for a given drive.
     This ID can be used as a folder_id to read from when fetching files.
@@ -1364,58 +1389,693 @@ async def get_drive_root_folder_id(ctx: Context, drive_id: str):
     except Exception as e:
         return f"Error getting the root folder ID for the drive ID '{drive_id}': {str(e)}"
 
+
 @mcp.tool()
 @requires_graph_auth
-async def read_sharepoint_files(
-        ctx: Context,
-        full_sharepoint_site_id: str = os.getenv("FULL_SHAREPOINT_SITE_ID"),
-        sharepoint_site_name: str = os.getenv("SHAREPOINT_SITE_NAME"),
-        drive_id: str = os.getenv("TOP_LEVEL_DRIVE_ID"),
-        drive_name: str = os.getenv("TOP_LEVEL_DRIVE_NAME"),
-        folder_id: str = os.getenv("TARGET_FOLDER_ID"),
-        folder_name: str = os.getenv("TARGET_FOLDER_NAME")
-    ):
-    from llama_index.readers.microsoft_sharepoint import SharePointReader
+async def list_llama_projects(ctx: Context) -> str:
+    """List existing LlamaCloud indices/pipelines"""
+    pipeline_controller = ctx.request_context.lifespan_context.llama
+    projects_list = await pipeline_controller.list_llama_projects()
+    return projects_list
 
-    auth_settings = ctx.request_context.lifespan_context.settings
-    client_id = auth_settings.client_id
-    client_secret = auth_settings.client_secret
-    tenant_id = auth_settings.tenant_id
+@mcp.tool()
+@requires_graph_auth
+async def list_llama_indices(ctx: Context, llama_project_id: Optional[str] = os.getenv('LLAMA_PROJECT_ID')) -> str:
+    """List existing LlamaCloud indices/pipelines"""
+    pipeline_controller = ctx.request_context.lifespan_context.llama
+    pipeline_list = await pipeline_controller.list_llama_indices(llama_project_id = llama_project_id)
+    return pipeline_list
 
-    logger = logging.getLogger(__name__)
+@mcp.tool()
+@requires_graph_auth
+async def get_llama_index(ctx: Context, index_id: str):
+    pipeline_controller = ctx.request_context.lifespan_context.llama
+    index = await pipeline_controller.get_pipeline(pipeline_id=index_id)
 
-    sharepoint_reader = SharePointReader(
-        client_id=client_id,
-        client_secret=client_secret,
-        tenant_id=tenant_id,
-        sharepoint_site_id=full_sharepoint_site_id,
-        sharepoint_site_name=sharepoint_site_name,
-        drive_name=drive_name,
-        sharepoint_folder_path=folder_name #It just needs the path relative to the drive (in this case, the folder name)
-    )
-
-    # Patches bug in SharePointReader init approach
-    sharepoint_reader._drive_id = drive_id
-    sharepoint_reader.drive_id = drive_id
-    sharepoint_reader._drive_id_endpoint = f"https://graph.microsoft.com/v1.0/sites/{full_sharepoint_site_id}/drives"
-
+@mcp.tool()
+@requires_graph_auth
+async def save_temp_file_locally(ctx: Context, file_suffix:str, file_content:str):
+    # Save to temp file
+    if file_suffix[0] != ".":
+        file_suffix = "." + file_suffix
     try:
-        # Load documents from SharePoint
-        documents = sharepoint_reader.load_data(
-            sharepoint_site_name=sharepoint_site_name,
-            sharepoint_folder_id=folder_id,
-            sharepoint_folder_path=folder_name,
-            recursive=True)
-        response = documents
-
-        # Immediately convert to a simple string and return
-        return response
+        with tempfile.NamedTemporaryFile(suffix=file_suffix, delete=False, ) as temp_file:
+            temp_file.write(file_content.encode())
+            temp_path = temp_file.name
+        return os.path.abspath(temp_path)
 
     except Exception as e:
-        logger.error(f"Could not load documents from SharePointReader: {str(e)}")
-        return f"Error loading documents: {str(e)}"
+        return f"Error saving file: {str(e)}"
 
 
+@mcp.tool()
+@requires_graph_auth
+async def quick_parse_sharepoint_file(ctx: Context, sharepoint_file_id:str = os.getenv('TEST_FILE_ID'), sharepoint_drive_id: str = os.getenv('TOP_LEVEL_DRIVE_ID')) -> str:
+    """Parse a SharePoint file using LlamaParse"""
 
-##########################
 
+    # Get the file from SharePoint
+    graph = ctx.request_context.lifespan_context.graph
+    file_content = await graph.user_client.drives.by_drive_id(sharepoint_drive_id).items.by_drive_item_id(sharepoint_file_id).content.get()
+
+    # Save to temp file
+    with tempfile.NamedTemporaryFile(suffix='.pptx', delete=False) as temp_file:
+        temp_file.write(file_content)
+        temp_path = temp_file.name
+
+    # Parse with LlamaParse
+    parser = LlamaParse(api_key=os.getenv("LLAMA_CLOUD_API_KEY"), auto_mode=True)
+    result = await parser.aparse(temp_path)
+
+    # Clean up
+    os.unlink(temp_path)
+
+    # Get markdown documents from the result
+    markdown_documents = result.get_markdown_documents()
+    docs = markdown_documents[0].text
+
+    return docs
+
+
+@mcp.tool()
+@requires_graph_auth
+async def create_sharepoint_data_source(ctx: Context, folder_path: str, folder_id: str, name_for_source: str) -> str:
+    """Create a SharePoint data source in LlamaCloud for document ingestion
+
+    Args:
+        ctx: FastMCP Context
+        folder_path: SharePoint folder path (e.g., '/sites/MySite/Documents/Folder')
+        folder_id: SharePoint folder ID
+        name_for_source: Name to give this data source in LlamaCloud
+
+    Returns:
+        Data source details or error message
+    """
+    pipeline_controller = ctx.request_context.lifespan_context.llama
+    result = await pipeline_controller.create_sharepoint_data_source(
+        folder_path=folder_path,
+        folder_id=folder_id,
+        name_for_source=name_for_source
+    )
+    return result
+
+
+@mcp.tool()
+@requires_graph_auth
+async def get_llama_data_sources(ctx: Context) -> str:
+    """Get all LlamaCloud data sources configured for your organization
+
+    Args:
+        ctx: FastMCP Context
+
+    Returns:
+        List of data sources with names and IDs
+    """
+    pipeline_controller = ctx.request_context.lifespan_context.llama
+    result = await pipeline_controller.get_data_sources_id_map()
+    return result
+
+
+@mcp.tool()
+@requires_graph_auth
+async def get_llama_data_source(ctx: Context, data_source_id: str) -> str:
+    """Get details of a specific LlamaCloud data source
+
+    Args:
+        ctx: FastMCP Context
+        data_source_id: ID of the data source to retrieve
+
+    Returns:
+        Data source details or error message
+    """
+    pipeline_controller = ctx.request_context.lifespan_context.llama
+    result = await pipeline_controller.get_data_source(data_source_id=data_source_id)
+    return result
+
+
+@mcp.tool()
+@requires_graph_auth
+async def get_llama_pipeline_datasources(ctx: Context, pipeline_id: str) -> str:
+    """Get all data sources connected to a specific LlamaCloud pipeline
+
+    Args:
+        ctx: FastMCP Context
+        pipeline_id: ID of the pipeline to check
+
+    Returns:
+        List of data sources connected to the pipeline
+    """
+    pipeline_controller = ctx.request_context.lifespan_context.llama
+    result = await pipeline_controller.get_pipeline_datasources(pipeline_id=pipeline_id)
+    return result
+
+
+@mcp.tool()
+@requires_graph_auth
+async def add_data_source_to_llama_pipeline(ctx: Context, pipeline_id: str, data_source_id: str,
+                                            sync_interval_hours: float = 12.0) -> str:
+    """Connect a data source to a LlamaCloud pipeline for indexing
+
+    Args:
+        ctx: FastMCP Context
+        pipeline_id: ID of the pipeline to add the data source to
+        data_source_id: ID of the data source to add
+        sync_interval_hours: How often to re-sync in hours (default: 12)
+
+    Returns:
+        Success confirmation or error message
+    """
+    pipeline_controller = ctx.request_context.lifespan_context.llama
+    # Convert hours to seconds for the API
+    sync_interval_seconds = sync_interval_hours * 3600
+    result = await pipeline_controller.add_data_source_to_pipeline(
+        pipeline_id=pipeline_id,
+        data_source_id=data_source_id,
+        sync_interval=sync_interval_seconds
+    )
+    return result
+
+
+@mcp.tool()
+@requires_graph_auth
+async def list_available_llama_files(ctx: Context, organization_id: str, raw_response:bool=False) -> str:
+    """List all files available in your LlamaCloud organization
+
+    Args:
+        ctx: FastMCP Context
+        organization_id: Your LlamaCloud organization ID
+
+    Returns:
+        List of files with IDs, paths, and content URLs
+    """
+    pipeline_controller = ctx.request_context.lifespan_context.llama
+    result = await pipeline_controller.list_available_llama_files(
+        organization_id=organization_id,
+        raw_response=raw_response
+    )
+    return result
+
+
+@mcp.tool()
+@requires_graph_auth
+async def list_llama_pipeline_files(ctx: Context, pipeline_id: str, raw_response:bool=False) -> str:
+    """List all files indexed by a specific LlamaCloud pipeline
+
+    Args:
+        ctx: FastMCP Context
+        pipeline_id: ID of the pipeline to check
+
+    Returns:
+        List of files with IDs, paths, and content URLs
+    """
+    pipeline_controller = ctx.request_context.lifespan_context.llama
+    result = await pipeline_controller.list_pipeline_files(pipeline_id=pipeline_id, raw_response=raw_response)
+    return result
+
+
+@mcp.tool()
+@requires_graph_auth
+async def search_llama_index(ctx: Context, pipeline_id: str, query: str) -> str:
+    """Search for information in a LlamaCloud pipeline's indexed documents
+
+    Args:
+        ctx: FastMCP Context
+        pipeline_id: ID of the pipeline to search
+        query: Search query to find relevant information
+
+    Returns:
+        Search results with relevance scores and source information
+    """
+    pipeline_controller = ctx.request_context.lifespan_context.llama
+    result = await pipeline_controller.search_index(
+        pipeline_id=pipeline_id,
+        query=query
+    )
+    return result
+
+
+@mcp.tool()
+@requires_graph_auth
+async def sync_llama_pipeline(ctx: Context, pipeline_id: str) -> str:
+    """Trigger a manual sync of a LlamaCloud pipeline to update its index
+
+    Args:
+        ctx: FastMCP Context
+        pipeline_id: ID of the pipeline to sync
+
+    Returns:
+        Sync status or error message
+    """
+    pipeline_controller = ctx.request_context.lifespan_context.llama
+    result = await pipeline_controller.sync_pipeline(pipeline_id=pipeline_id)
+    return result
+
+
+@mcp.tool()
+@requires_graph_auth
+async def create_llama_retriever(
+        ctx: Context,
+        name: str,
+        pipeline_ids: str,
+        project_id: Optional[str] = None
+) -> str:
+    """Create a new LlamaCloud retriever for advanced multi-pipeline search
+
+    Args:
+        ctx: FastMCP Context
+        name: Name for the retriever
+        pipeline_ids: Comma-separated list of pipeline IDs to include
+        project_id: Optional project ID (defaults to env var)
+
+    Returns:
+        Created retriever details
+    """
+    pipeline_controller = ctx.request_context.lifespan_context.llama
+
+    # Parse pipeline IDs
+    pipeline_id_list = [pid.strip() for pid in pipeline_ids.split(',')]
+
+    result = await pipeline_controller.create_retriever(
+        name=name,
+        pipeline_ids=pipeline_id_list,
+        project_id=project_id
+    )
+
+    return f"Created retriever '{result.name}' with ID: {result.id}"
+
+
+@mcp.tool()
+@requires_graph_auth
+async def list_llama_retrievers(
+        ctx: Context,
+        project_id: Optional[str] = None
+) -> str:
+    """List all LlamaCloud retrievers in the project
+
+    Args:
+        ctx: FastMCP Context
+        project_id: Optional project ID (defaults to env var)
+
+    Returns:
+        List of retrievers with their configurations
+    """
+    pipeline_controller = ctx.request_context.lifespan_context.llama
+    result = await pipeline_controller.list_retrievers(project_id=project_id)
+    return result
+
+
+@mcp.tool()
+@requires_graph_auth
+async def search_with_retriever(
+        ctx: Context,
+        retriever_id: str,
+        query: str,
+        mode: str = "routing",
+        rerank_top_n: Optional[int] = None
+) -> str:
+    """Search using an existing LlamaCloud retriever for advanced multi-pipeline search
+
+    Args:
+        ctx: FastMCP Context
+        retriever_id: ID of the retriever to use
+        query: Search query
+        mode: Retrieval mode - 'routing' (auto-select best pipeline) or 'full' (search all pipelines)
+        rerank_top_n: Optional number of results to rerank
+
+    Returns:
+        Search results from the retriever
+    """
+    pipeline_controller = ctx.request_context.lifespan_context.llama
+    result = await pipeline_controller.retrieve_with_retriever(
+        retriever_id=retriever_id,
+        query=query,
+        mode=mode,
+        rerank_top_n=rerank_top_n
+    )
+    return result
+
+
+@mcp.tool()
+@requires_graph_auth
+async def direct_multi_pipeline_search(
+        ctx: Context,
+        pipeline_ids: str,
+        query: str,
+        mode: str = "routing",
+        rerank_top_n: Optional[int] = None,
+        top_k_per_pipeline: int = 10,
+        project_id: Optional[str] = None
+) -> str:
+    """Search across multiple LlamaCloud pipelines without creating a persistent retriever
+
+    Args:
+        ctx: FastMCP Context
+        pipeline_ids: Comma-separated list of pipeline IDs to search
+        query: Search query
+        mode: Retrieval mode - 'routing' (auto-select best pipeline) or 'full' (search all pipelines)
+        rerank_top_n: Optional number of results to rerank
+        top_k_per_pipeline: Number of results per pipeline (default: 10)
+        project_id: Optional project ID (defaults to env var)
+
+    Returns:
+        Search results across pipelines
+    """
+    pipeline_controller = ctx.request_context.lifespan_context.llama
+
+    # Parse pipeline IDs
+    pipeline_id_list = [pid.strip() for pid in pipeline_ids.split(',')]
+
+    result = await pipeline_controller.direct_retrieve(
+        pipeline_ids=pipeline_id_list,
+        query=query,
+        mode=mode,
+        rerank_top_n=rerank_top_n,
+        top_k_per_pipeline=top_k_per_pipeline,
+        project_id=project_id
+    )
+    return result
+
+
+@mcp.tool()
+@requires_graph_auth
+async def upload_sharepoint_file_to_llamacloud(
+        ctx: Context,
+        sharepoint_drive_id: str,
+        sharepoint_file_id: str
+) -> str:
+    """Upload a SharePoint file to LlamaCloud (just upload, no pipeline)
+
+    Args:
+        ctx: FastMCP Context
+        sharepoint_drive_id: SharePoint drive ID
+        sharepoint_file_id: SharePoint file ID
+
+    Returns:
+        LlamaCloud file ID after upload
+    """
+    graph = ctx.request_context.lifespan_context.graph
+    pipeline_controller = ctx.request_context.lifespan_context.llama
+
+    result = await pipeline_controller.upload_sharepoint_file_to_llamacloud(
+        sharepoint_drive_id=sharepoint_drive_id,
+        sharepoint_file_id=sharepoint_file_id,
+        graph_client=graph.user_client,
+        project_id=None
+    )
+
+    return result
+
+
+@mcp.tool()
+@requires_graph_auth
+async def list_llama_file_screenshots(
+        ctx: Context,
+        file_id: str
+) -> str:
+    """List all page screenshots available for a LlamaCloud file
+
+    Args:
+        ctx: FastMCP Context
+        file_id: LlamaCloud file ID
+
+    Returns:
+        List of available page screenshots with metadata
+    """
+    pipeline_controller = ctx.request_context.lifespan_context.llama
+    result = await pipeline_controller.list_file_screenshots(file_id=file_id)
+    return result
+
+
+@mcp.tool()
+@requires_graph_auth
+async def get_llama_file_screenshot(
+        ctx: Context,
+        file_id: str,
+        page_index: int
+) -> Image:
+    from mcp.server.fastmcp import Image
+    """Get a page screenshot from a LlamaCloud file as an image
+
+    Args:
+        ctx: FastMCP Context
+        file_id: LlamaCloud file ID
+        page_index: Page number (0-based index)
+
+    Returns:
+        Screenshot image that can be viewed by the LLM
+    """
+    pipeline_controller = ctx.request_context.lifespan_context.llama
+
+    # Get screenshot data
+    screenshot_data = await pipeline_controller.get_file_screenshot(
+        file_id=file_id,
+        page_index=page_index
+    )
+
+    # Detect image format from magic bytes
+    if screenshot_data[:4] == b'\xff\xd8\xff\xe0' or screenshot_data[:4] == b'\xff\xd8\xff\xe1':
+        fmt = "jpeg"
+    elif screenshot_data[:8] == b'\x89PNG\r\n\x1a\n':
+        fmt = "png"
+    else:
+        # Default to jpeg based on what we saw in the error
+        fmt = "jpeg"
+
+    # Return as FastMCP Image with correct fmt
+    return Image(data=screenshot_data, format=fmt)
+
+@mcp.tool()
+@requires_graph_auth
+async def get_llama_file_download_url(
+        ctx: Context,
+        file_id: str,
+        expires_in_seconds: int = 3600
+) -> str:
+    """Get a temporary download URL for a LlamaCloud file
+
+    Args:
+        ctx: FastMCP Context
+        file_id: LlamaCloud file ID
+        expires_in_seconds: How long the URL should be valid (default: 1 hour)
+
+    Returns:
+        Presigned URL for downloading the file
+    """
+    pipeline_controller = ctx.request_context.lifespan_context.llama
+    url = await pipeline_controller.get_file_content_url(
+        file_id=file_id,
+        expires_in_seconds=expires_in_seconds
+    )
+    return f"Download URL (expires in {expires_in_seconds} seconds): {url}"
+
+
+# Add these tools to server.py
+
+@mcp.tool()
+@requires_graph_auth
+async def create_llama_pipeline(
+        ctx: Context,
+        name: str,
+        pipeline_config: Any,
+        project_id: Optional[str] = None
+) -> str:
+    """Create a new LlamaCloud pipeline with specified configuration
+
+    Args:
+        ctx: FastMCP Context
+        name: Name for the new pipeline
+        pipeline_config: JSON configuration for the pipeline. Example:
+            {
+                "embedding_config": {
+                    "type": "OPENAI_EMBEDDING",
+                    "component": {
+                        "model_name": "text-embedding-3-small",
+                        "api_key": "your-key"
+                    }
+                },
+                "transform_config": {
+                    "mode": "auto",
+                    "config": {
+                        "chunk_size": 1024,
+                        "chunk_overlap": 200
+                    }
+                },
+                "preset_retrieval_parameters": {
+                    "retrieve_image_nodes": true,
+                    "dense_similarity_top_k": 30,
+                    "enable_reranking": true
+                },
+                "llama_parse_parameters": {
+                    "take_screenshot": true,
+                    "extract_charts": true,
+                    "disable_image_extraction": false
+                }
+            }
+        project_id: Optional project ID (defaults to env var)
+
+    Returns:
+        Created pipeline details or error message
+    """
+    pipeline_controller = ctx.request_context.lifespan_context.llama
+
+    # Parse the config if it's a string
+    if isinstance(pipeline_config, str):
+        try:
+            pipeline_config = json.loads(pipeline_config)
+        except json.JSONDecodeError:
+            return "Error: Invalid JSON in pipeline_config"
+
+    result = await pipeline_controller.create_pipeline(
+        name=name,
+        project_id=project_id,
+        pipeline_config=pipeline_config
+    )
+
+    return result
+
+
+@mcp.tool()
+@requires_graph_auth
+async def update_llama_pipeline(
+        ctx: Context,
+        pipeline_id: str,
+        update_config: Any
+) -> str:
+    """Update an existing LlamaCloud pipeline configuration
+
+    Args:
+        ctx: FastMCP Context
+        pipeline_id: ID of the pipeline to update
+        update_config: JSON configuration with updates. Example:
+            {
+                "preset_retrieval_parameters": {
+                    "retrieve_image_nodes": true
+                },
+                "llama_parse_parameters": {
+                    "take_screenshot": true,
+                    "extract_charts": true
+                }
+            }
+
+    Returns:
+        Update status or error message
+    """
+    pipeline_controller = ctx.request_context.lifespan_context.llama
+
+    # Parse the config if it's a string
+    if isinstance(update_config, str):
+        try:
+            update_config = json.loads(update_config)
+        except json.JSONDecodeError:
+            return "Error: Invalid JSON in update_config"
+
+    result = await pipeline_controller.update_pipeline(
+        pipeline_id=pipeline_id,
+        update_config=update_config
+    )
+
+    return result
+
+
+# Add this tool to server.py
+
+@mcp.tool()
+@requires_graph_auth
+async def add_files_to_llama_pipeline(
+        ctx: Context,
+        pipeline_id: str,
+        file_ids: str
+) -> str:
+    """Add existing LlamaCloud files to a pipeline for processing
+
+    Args:
+        ctx: FastMCP Context
+        pipeline_id: ID of the pipeline to add files to
+        file_ids: Comma-separated list of LlamaCloud file IDs to add
+
+    Returns:
+        Success message with added files or error
+    """
+    pipeline_controller = ctx.request_context.lifespan_context.llama
+
+    # Parse the comma-separated file IDs
+    file_id_list = [fid.strip() for fid in file_ids.split(',') if fid.strip()]
+
+    if not file_id_list:
+        return "Error: No valid file IDs provided"
+
+    result = await pipeline_controller.add_files_to_pipeline(
+        pipeline_id=pipeline_id,
+        file_ids=file_id_list
+    )
+
+    return result
+
+@mcp.tool()
+@requires_graph_auth
+async def get_index_status(ctx: Context, pipeline_id) -> str:
+
+    pipeline_controller = ctx.request_context.lifespan_context.llama
+    try:
+        response = await pipeline_controller.client.pipelines.get_pipeline_status(pipeline_id=pipeline_id)
+        return response
+    except Exception as e:
+        return f"Error getting pipeline status: {str(e)}"
+
+
+@mcp.tool()
+@requires_graph_auth
+async def upload_file_to_sharepoint_folder(ctx: Context, drive_id: str, folder_id: str, file_name: str, file_content: bytes):
+    """
+    Upload a file to a specific folder in SharePoint
+
+    Args:
+        ctx: FastMCP Context
+        drive_id: The drive ID
+        folder_id: The folder's item ID
+        file_name: Name for the file
+        file_content: File content as bytes
+    """
+    import httpx
+
+    settings = ctx.request_context.lifespan_context.settings
+    token = settings.credential.get_token("https://graph.microsoft.com/.default")
+
+    async with httpx.AsyncClient() as client:
+        response = await client.put(
+            f"https://graph.microsoft.com/v1.0/drives/{drive_id}/items/{folder_id}:/{file_name}:/content",
+            headers={
+                "Authorization": f"Bearer {token.token}",
+                "Content-Type": "text/plain"
+            },
+            content=file_content
+        )
+        return response.json()
+
+
+@mcp.tool()
+@requires_graph_auth
+async def rename_sharepoint_file(ctx: Context, drive_id: str, file_id: str, new_name: str) -> str:
+    """
+    Rename a file in SharePoint
+
+    Args:
+        ctx: FastMCP Context
+        drive_id: The drive ID
+        file_id: The file's item ID
+        new_name: New name for the file (include extension)
+
+    Returns:
+        Success message with new file details
+    """
+    from msgraph.generated.models.drive_item import DriveItem
+
+    graph = ctx.request_context.lifespan_context.graph
+
+    request_body = DriveItem(
+        name=new_name,
+    )
+
+    result = await graph.user_client.drives.by_drive_id(drive_id).items.by_drive_item_id(file_id).patch(request_body)
+
+    return f"File renamed successfully to: {result.name}"
