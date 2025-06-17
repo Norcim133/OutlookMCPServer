@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/norcim133-outlookmcpserver-badge.png)](https://mseep.ai/app/norcim133-outlookmcpserver)
+
 # OutlookMCPServer
 
 This project is an MCP server that gives Claude Desktop access to your Microsoft 365 mail, calendar, and (soon) files using the Microsoft Graph API.
