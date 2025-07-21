@@ -1,14 +1,11 @@
 from mcp.server.fastmcp import FastMCP, Context
 from mcp.server.fastmcp.prompts import base
-
-
 from mcpserver.calendar_formatting import format_event_page
 from mcpserver.auth_wrapper import requires_graph_auth
 from mcpserver.context_manager import app_lifespan
 from mcpserver.mail_query import MailQuery
 from typing import Any, Optional, List
 import json
-import logging
 import os
 
 APP_INSTRUCTIONS = """
@@ -24,12 +21,22 @@ You can:
 - Get calendar events and meetings
 - Create events and invites
 
+File Management:
+- Search Microsoft OneDrive/SharePoint files
+- List and navigate SharePoint sites and document libraries
+
+When answering questions about document content:
+1. First use retrieval tools to find relevant chunks
+2. Then synthesize an answer based on the retrieved information
+3. Be clear about which documents the information comes from
+
+
 By default for mail, use html formatting. Do not hallucinate data. Use MCP tools to fetch actual messages or folders.
 When unsure which folder an email belongs to, inspect the email body and/or compare the content with other mails already in the folder.
 
 Always be helpful, privacy-conscious, and structured in your reasoning.
 
-IMPORTANT: Always use html formatting for the body of emails and calendar events. Do not hallucinate date.
+IMPORTANT: Always use html formatting for the body of emails and calendar events. Do not hallucinate data.
 """
 
 # Create an MCP server
@@ -114,7 +121,6 @@ def format_email_headers(message_page):
     return result
 
 
-# Add a tool to list inbox messages
 @mcp.tool()
 @requires_graph_auth
 async def list_inbox_messages(ctx: Context, count: int = 50) -> str:
@@ -1068,7 +1074,7 @@ async def get_current_datetime(ctx: Context) -> str:
 
 @mcp.tool()
 @requires_graph_auth
-async def list_followed_sites(ctx: Context):
+async def list_followed_sharepoint_sites(ctx: Context):
     """
     Retrieves a list of SharePoint sites that the current user is following,
     returning their display names, IDs, and web URLs.
@@ -1111,7 +1117,7 @@ async def get_sharepoint_site_drives(ctx: Context, site_id: str = os.environ.get
 
 @mcp.tool()
 @requires_graph_auth
-async def list_drive_root_items(ctx: Context, drive_id: str):
+async def list_sharepoint_drive_root_items(ctx: Context, drive_id: str):
     """
     Lists files and folders in the root of a specific drive (document library).
 
@@ -1138,7 +1144,7 @@ async def list_drive_root_items(ctx: Context, drive_id: str):
 
 @mcp.tool()
 @requires_graph_auth
-async def list_drive_folder_items(ctx: Context, drive_id: str, folder_item_id: str):
+async def list_sharepoint_drive_folder_items(ctx: Context, drive_id: str, folder_item_id: str):
     """
     Lists files and folders within a specific folder in a drive.
 
@@ -1165,7 +1171,7 @@ async def list_drive_folder_items(ctx: Context, drive_id: str, folder_item_id: s
 
 @mcp.tool()
 @requires_graph_auth
-async def get_organization_id(ctx: Context):
+async def get_sharepoint_organization_id(ctx: Context):
     """
     Get the organization ID.
 
@@ -1206,7 +1212,7 @@ async def get_sharepoint_site_id_from_user(ctx: Context, site_index: int = 0):
 
 @mcp.tool()
 @requires_graph_auth
-async def get_user_drives(ctx: Context):
+async def get_user_sharepoint_or_onedrive_drives(ctx: Context):
     """
     Get the list of drives (document libraries) for the user's default site.
 
@@ -1225,7 +1231,7 @@ async def get_user_drives(ctx: Context):
 
 @mcp.tool()
 @requires_graph_auth
-async def get_user_main_drive(ctx: Context):
+async def get_user_main_microsoft_drive(ctx: Context):
     """
     Get the main drive (document library) for the user's default site.
 
@@ -1244,7 +1250,7 @@ async def get_user_main_drive(ctx: Context):
 
 @mcp.tool()
 @requires_graph_auth
-async def get_user_drive_id(ctx: Context):
+async def get_user_microsoft_drive_id(ctx: Context):
     """
     Get the ID of the user's default drive (document library).
 
@@ -1263,7 +1269,7 @@ async def get_user_drive_id(ctx: Context):
 
 @mcp.tool()
 @requires_graph_auth
-async def get_root_drive_item_for_user(ctx: Context):
+async def get_msft_root_drive_item_for_user(ctx: Context):
     """
     Get the root drive item (e.g. folder) for the user.
 
@@ -1282,7 +1288,7 @@ async def get_root_drive_item_for_user(ctx: Context):
 
 @mcp.tool()
 @requires_graph_auth
-async def get_root_drive_item_id_for_user(ctx: Context):
+async def get_msft_root_drive_item_id_for_user(ctx: Context):
     """
     Get the ID of the root drive item (e.g. folder) for the user.
 
@@ -1301,7 +1307,7 @@ async def get_root_drive_item_id_for_user(ctx: Context):
 
 @mcp.tool()
 @requires_graph_auth
-async def get_files(ctx: Context, drive_id: str, drive_item_id: str):
+async def get_microsoft_files(ctx: Context, drive_id: str, drive_item_id: str):
     """
     Get the files in a specific folder in a drive.
 
@@ -1315,14 +1321,14 @@ async def get_files(ctx: Context, drive_id: str, drive_item_id: str):
     """
     files = ctx.request_context.lifespan_context.graph.files
     try:
-        files_info = await files.get_files(drive_id, drive_item_id)
+        files_info = await files.get_folders_and_files_from_drive_item(drive_id, drive_item_id)
         return files_info
     except Exception as e:
         return f"Error retrieving files for drive ID '{drive_id}' and drive item ID '{drive_item_id}': {str(e)}"
 
 @mcp.tool()
 @requires_graph_auth
-async def search_drive(ctx: Context, query: str, drive_id: str):
+async def search_microsoft_drive(ctx: Context, query: str, drive_id: str):
     """
     Search for files and folders in the user's OneDrive or SharePoint site drive
 
@@ -1343,7 +1349,7 @@ async def search_drive(ctx: Context, query: str, drive_id: str):
 
 @mcp.tool()
 @requires_graph_auth
-async def get_drive_root_folder_id(ctx: Context, drive_id: str):
+async def get_msft_drive_root_folder_id(ctx: Context, drive_id: str):
     """
     Gets the ID of the root folder (DriveItem) for a given drive.
     This ID can be used as a folder_id to read from when fetching files.
@@ -1364,58 +1370,62 @@ async def get_drive_root_folder_id(ctx: Context, drive_id: str):
     except Exception as e:
         return f"Error getting the root folder ID for the drive ID '{drive_id}': {str(e)}"
 
+
+
+
 @mcp.tool()
 @requires_graph_auth
-async def read_sharepoint_files(
-        ctx: Context,
-        full_sharepoint_site_id: str = os.getenv("FULL_SHAREPOINT_SITE_ID"),
-        sharepoint_site_name: str = os.getenv("SHAREPOINT_SITE_NAME"),
-        drive_id: str = os.getenv("TOP_LEVEL_DRIVE_ID"),
-        drive_name: str = os.getenv("TOP_LEVEL_DRIVE_NAME"),
-        folder_id: str = os.getenv("TARGET_FOLDER_ID"),
-        folder_name: str = os.getenv("TARGET_FOLDER_NAME")
-    ):
-    from llama_index.readers.microsoft_sharepoint import SharePointReader
+async def upload_file_to_sharepoint_folder(ctx: Context, drive_id: str, folder_id: str, file_name: str, file_content: bytes):
+    """
+    Upload a file to a specific folder in SharePoint
 
-    auth_settings = ctx.request_context.lifespan_context.settings
-    client_id = auth_settings.client_id
-    client_secret = auth_settings.client_secret
-    tenant_id = auth_settings.tenant_id
+    Args:
+        ctx: FastMCP Context
+        drive_id: The drive ID
+        folder_id: The folder's item ID
+        file_name: Name for the file
+        file_content: File content as bytes
+    """
+    import httpx
 
-    logger = logging.getLogger(__name__)
+    settings = ctx.request_context.lifespan_context.settings
+    token = settings.credential.get_token("https://graph.microsoft.com/.default")
 
-    sharepoint_reader = SharePointReader(
-        client_id=client_id,
-        client_secret=client_secret,
-        tenant_id=tenant_id,
-        sharepoint_site_id=full_sharepoint_site_id,
-        sharepoint_site_name=sharepoint_site_name,
-        drive_name=drive_name,
-        sharepoint_folder_path=folder_name #It just needs the path relative to the drive (in this case, the folder name)
+    async with httpx.AsyncClient() as client:
+        response = await client.put(
+            f"https://graph.microsoft.com/v1.0/drives/{drive_id}/items/{folder_id}:/{file_name}:/content",
+            headers={
+                "Authorization": f"Bearer {token.token}",
+                "Content-Type": "text/plain"
+            },
+            content=file_content
+        )
+        return response.json()
+
+
+@mcp.tool()
+@requires_graph_auth
+async def rename_sharepoint_file(ctx: Context, drive_id: str, file_id: str, new_name: str) -> str:
+    """
+    Rename a file in SharePoint
+
+    Args:
+        ctx: FastMCP Context
+        drive_id: The drive ID
+        file_id: The file's item ID
+        new_name: New name for the file (include extension)
+
+    Returns:
+        Success message with new file details
+    """
+    from msgraph.generated.models.drive_item import DriveItem
+
+    graph = ctx.request_context.lifespan_context.graph
+
+    request_body = DriveItem(
+        name=new_name,
     )
 
-    # Patches bug in SharePointReader init approach
-    sharepoint_reader._drive_id = drive_id
-    sharepoint_reader.drive_id = drive_id
-    sharepoint_reader._drive_id_endpoint = f"https://graph.microsoft.com/v1.0/sites/{full_sharepoint_site_id}/drives"
+    result = await graph.user_client.drives.by_drive_id(drive_id).items.by_drive_item_id(file_id).patch(request_body)
 
-    try:
-        # Load documents from SharePoint
-        documents = sharepoint_reader.load_data(
-            sharepoint_site_name=sharepoint_site_name,
-            sharepoint_folder_id=folder_id,
-            sharepoint_folder_path=folder_name,
-            recursive=True)
-        response = documents
-
-        # Immediately convert to a simple string and return
-        return response
-
-    except Exception as e:
-        logger.error(f"Could not load documents from SharePointReader: {str(e)}")
-        return f"Error loading documents: {str(e)}"
-
-
-
-##########################
-
+    return f"File renamed successfully to: {result.name}"

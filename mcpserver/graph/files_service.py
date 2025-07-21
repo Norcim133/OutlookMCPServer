@@ -350,4 +350,3 @@ class FilesService:
             import traceback
             traceback.print_exc()
             return f"Error getting root folder ID for drive '{drive_id}': {str(e)}"
-

@@ -22,13 +22,11 @@ class MailService:
 
     async def get_inbox(self, count: int=50):
         query_params = MessagesRequestBuilder.MessagesRequestBuilderGetQueryParameters(
-            # Only request specific properties
             select=['from', 'isRead', 'receivedDateTime', 'subject', 'id', 'toRecipients', 'ccRecipients', 'bccRecipients', 'replyTo'],
-
             top=count,
-            # Sort by received time, newest first
             orderby=['receivedDateTime DESC']
         )
+
         request_config = MessagesRequestBuilder.MessagesRequestBuilderGetRequestConfiguration(
             query_parameters= query_params
         )

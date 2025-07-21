@@ -6,7 +6,6 @@ __pycache__/
 # Virtual environments
 .venv/
 .env
-.streamlit/secrets.toml
 
 # IDE/editor config
 .vscode/
@@ -25,5 +24,8 @@ tests/__pycache__/
 tests/
 pytest.ini
 *.log
+
+
+deprecated/
 
 

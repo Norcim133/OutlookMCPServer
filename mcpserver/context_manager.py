@@ -25,6 +25,7 @@ async def app_lifespan(server: Optional[FastMCP]) -> AsyncIterator[AppContext]:
         settings = AzureSettings()
         user_client = settings.get_user_client()
         graph = GraphController(user_client)
+
         logging.info("Settings initialized: in app_lifespan")
     except Exception as e:
         logging.error(f"Error in app_lifespan: {str(e)}")
