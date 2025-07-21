@@ -9,7 +9,4 @@ dependencies = [
     "msgraph-core",
     "msgraph-sdk",
     "pytest",
-    "numpy>2.0",
-    "pandas>2.1.0",
-    "streamlit",
 ]
