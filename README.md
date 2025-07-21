@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/norcim133-outlookmcpserver-badge.png)](https://mseep.ai/app/norcim133-outlookmcpserver)
+
 # OutlookMCPServer
 
 This project is an MCP server that gives Claude Desktop access to your Microsoft 365 mail, calendar, and (soon) files using the Microsoft Graph API.
@@ -36,12 +38,20 @@ This is currently built to:
 
 ## 🚀 Getting Started
 
-```bash
+# Clone the repository and navigate to it
+```
+git clone https://github.com/Norcim133/OutlookMCPServer.git
+cd OutlookMCPServer
+```
+
 # Set up the environment
+```
 uv venv
-uv pip install -r uv.lock
+uv sync
+```
 
 # Run locally using MCP Inspector
+```
 mcp dev main.py (expect errors)
 ```
 It is much easier to get things working in the Inspector before trying to debug in Claude.

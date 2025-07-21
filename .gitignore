@@ -25,7 +25,4 @@ tests/
 pytest.ini
 *.log
 
-
 deprecated/
-
-
