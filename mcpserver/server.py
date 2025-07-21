@@ -30,8 +30,6 @@ When answering questions about document content:
 2. Then synthesize an answer based on the retrieved information
 3. Be clear about which documents the information comes from
 
-When taking ingestion or retrieval actions:
-1. Check status of pipeline
 
 By default for mail, use html formatting. Do not hallucinate data. Use MCP tools to fetch actual messages or folders.
 When unsure which folder an email belongs to, inspect the email body and/or compare the content with other mails already in the folder.
