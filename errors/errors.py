@@ -15,9 +15,3 @@ class MissingValueError(ValueError): # For input validation errors
 
 class APIError(Exception):
     pass
-
-class LlamaCloudClientInitError(Exception):
-    pass
-
-class LlamaOperationFailedError(APIError):
-    pass
